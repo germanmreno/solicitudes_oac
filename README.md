@@ -44,6 +44,32 @@ SQL
 - Usuario: `admin`
 - Contraseña: la que imprima `npm run db:seed` (solo se muestra una vez).
 
+## Variables de entorno (.env)
+El backend lee **`backend/.env`** (los scripts de workspace corren desde `backend/`). La raíz también tiene un `.env` y un `.env.example` de referencia; el que importa en runtime es `backend/.env`. Copia la plantilla y ajusta los valores:
+
+```bash
+cp .env.example .env          # raíz (referencia)
+cp backend/.env.example backend/.env   # si existe; si no, crea backend/.env con las variables
+```
+
+| Variable | Uso | Dev | Producción |
+|---|---|---|---|
+| `DATABASE_URL` | Conexión a PostgreSQL | `postgresql://cvm_censo:…@localhost:5432/cvm_censo` | igual con usuario/clave reales |
+| `JWT_SECRET` | Firma del access token (≥16 chars) | cualquier valor largo | **aleatorio** |
+| `JWT_REFRESH_SECRET` | Firma del refresh token (≥16 chars) | cualquier valor largo | **aleatorio** |
+| `JWT_ACCESS_TTL` | Vida del access token | `15m` | `15m` |
+| `JWT_REFRESH_TTL` | Vida del refresh token | `7d` | `7d` |
+| `PORT` | Puerto del backend | `4700` | `4700` |
+| `NODE_ENV` | Entorno | `development` | `production` |
+| `CORS_ORIGIN` | Origen exacto del frontend | `http://localhost:4701` | `https://cvm.com.ve` |
+| `COOKIE_PATH` | Path de la cookie de refresh. **Crítico bajo subpath**: debe coincidir con el path que ve el navegador | `/api/v1/auth` | **`/oac/api/v1/auth`** |
+| `UPLOAD_DIR` | Carpeta de archivos subidos | `./uploads` | `./uploads` (con permiso de escritura) |
+| `MAX_UPLOAD_MB` | Tamaño máximo por archivo | `10` | `10` |
+
+**Frontend**: no requiere variables. La base de la API y el router derivan automáticamente de `BASE_URL` (`/oac/api/v1` y `/oac` en producción; `/oac/api/v1` en dev vía proxy de Vite). `frontend/.env.example` es opcional y solo se usaría si se adopta `VITE_API_URL` en el futuro.
+
+> ⚠️ **Nunca versionar `.env`**. Están en `.gitignore`. Los secretos se generan en el servidor, no se suben al repo.
+
 ## Comandos
 | Acción | Comando |
 |---|---|
