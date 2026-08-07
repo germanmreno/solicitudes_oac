@@ -90,6 +90,30 @@ censo_cvm/
 - En producción, `COOKIE_PATH` del backend debe ser `/oac/api/v1/auth` para que el refresh silencioso funcione.
 - Build: `npm run build` (frontend en `frontend/dist/`, backend con `NODE_ENV=production`). Ver `AGENTS.md` → "Producción (despliegue bajo subpath /oac/)" para el ejemplo Nginx completo.
 
+### Checklist de despliegue en el servidor (tras el `git clone`)
+1. **Instalar dependencias del SO**: Node.js 20+, PostgreSQL 16+ y Nginx (nativo, sin Docker).
+2. **Crear base de datos y usuario**:
+   ```bash
+   sudo -u postgres psql <<'SQL'
+   CREATE USER cvm_censo WITH PASSWORD 'cambiar_en_produccion';
+   CREATE DATABASE cvm_censo OWNER cvm_censo;
+   GRANT ALL PRIVILEGES ON DATABASE cvm_censo TO cvm_censo;
+   SQL
+   ```
+3. **Configurar el entorno**: `cp .env.example .env` (y `cp backend/.env.example backend/.env` si existe) y rellenar:
+   - `DATABASE_URL` con el usuario/clave de producción.
+   - `JWT_SECRET` y `JWT_REFRESH_SECRET` con valores largos y aleatorios (≥16 chars).
+   - `NODE_ENV=production`, `PORT=4700`.
+   - `CORS_ORIGIN=https://cvm.com.ve` (same-origin no aplica, pero queda correcto).
+   - `COOKIE_PATH=/oac/api/v1/auth` (**obligatorio** para el refresh bajo subpath).
+4. **Instalar dependencias y migrar**: `npm install` y `npm run db:migrate` (crea las tablas).
+5. **Sembrar datos base**: `npm run db:seed` (crea el admin con contraseña temporal — rotarla al primer login; crea catálogos y tipos de documento).
+6. **Construir el frontend**: `npm run build` → subir `frontend/dist/` a `/var/www/oac/`.
+7. **Servir el backend**: correr el backend en `:4700` (p. ej. con `pm2` o `systemd`) apuntando a `backend/` con `NODE_ENV=production`.
+8. **Configurar Nginx** (ejemplo en `AGENTS.md`): `location /oac/api/ → proxy_pass :4700/api/` y `location /oac/ → alias /var/www/oac/` con `try_files … /oac/index.html`.
+9. **Permisos de uploads**: asegurar que el usuario del backend tiene escritura en `backend/uploads/` y respaldarlo periódicamente.
+10. **Verificación**: abrir `https://cvm.com.ve/oac/` → login → crear solicitud → adjuntar documentos → consulta pública en `/oac/consulta`.
+
 ## Troubleshooting
 - **`PrismaClientInitializationError`**: revisar `DATABASE_URL` y que Postgres esté corriendo.
 - **`port 4700 already in use` (Windows)**: abrir Administrador de tareas → finalizar `node.exe`, o cambiar `PORT` en `.env`.

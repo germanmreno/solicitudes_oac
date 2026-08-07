@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+}
+
+enum AidStatus {
+  ATENDIDO
+  EN_PROCESO
+  EN_EVALUACION
+  NO_PROCEDE
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  PAGADO
+  ANULADO
+}
+
+enum DocumentKind {
+  MEDICAL
+  INVOICE
+}
+
+enum Sex {
+  MASCULINO
+  FEMENINO
+}
+
+model OriginType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  requiresSite Boolean @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  census      Census[]
+}
+
+model Site {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  census    Census[]
+}
+
+model AidType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  areas       AidArea[]
+  census      Census[]
+  documentTypes AidTypeDocumentType[]
+}
+
+model AidArea {
+  id             String   @id @default(uuid())
+  aidTypeId      String
+  aidType        AidType  @relation(fields: [aidTypeId], references: [id])
+  name           String
+  requiresDetail Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  census         Census[]
+
+  @@unique([aidTypeId, name])
+  @@index([aidTypeId])
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  fullName     String
+  role         Role     @default(OPERATOR)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  census       Census[] @relation("CreatedBy")
+  auditLogs    AuditLog[]
+}
+
+model Census {
+  id                          String         @id @default(uuid())
+  fileNumber                  String?        @unique
+  registrationDate            DateTime       @default(now())
+
+  applicantName               String
+  applicantIdNumber           String
+  applicantSex                Sex
+  originTypeId                String
+  originType                  OriginType     @relation(fields: [originTypeId], references: [id])
+  siteId                      String?
+  site                        Site?          @relation(fields: [siteId], references: [id])
+  originDetail                String?
+  phone                       String?
+  email                       String?
+  idDocumentPath              String?
+  idDocumentTypeId            String?
+  idDocumentType              DocumentType? @relation("CensusIdDocument", fields: [idDocumentTypeId], references: [id], onDelete: SetNull)
+
+  beneficiarySameAsApplicant  Boolean        @default(true)
+  beneficiaryName             String?
+  beneficiaryIdNumber         String?
+  beneficiarySex              Sex?
+
+  aidTypeId                   String
+  aidType                     AidType        @relation(fields: [aidTypeId], references: [id])
+  aidAreaId                   String
+  aidArea                     AidArea        @relation(fields: [aidAreaId], references: [id])
+  aidAreaOther                String?
+  aidDescription              String
+
+  aidStatus                   AidStatus      @default(EN_EVALUACION)
+  aidProvider                 String?
+  aidObservation              String?
+  amountUsd                   Decimal?       @db.Decimal(12, 2)
+  amountBs                    Decimal?       @db.Decimal(14, 2)
+
+  paymentRate                 Decimal?       @db.Decimal(10, 4)
+  paymentDate                 DateTime?
+  paymentStatus               PaymentStatus?
+  invoicePath                 String?
+  invoiceTypeId               String?
+  invoiceType                 DocumentType? @relation("CensusInvoice", fields: [invoiceTypeId], references: [id], onDelete: SetNull)
+
+  createdById                 String
+  createdBy                   User           @relation("CreatedBy", fields: [createdById], references: [id])
+  documents                   CensusDocument[]
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@index([applicantIdNumber])
+  @@index([registrationDate])
+  @@index([aidStatus])
+  @@index([createdById])
+  @@index([originTypeId])
+  @@index([siteId])
+  @@index([aidTypeId])
+  @@index([aidAreaId])
+}
+
+model DocumentType {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  code              String   @unique
+  requiredByDefault Boolean  @default(false)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  aidTypes          AidTypeDocumentType[]
+  documents         CensusDocument[]
+  censusIdDocs      Census[]   @relation("CensusIdDocument")
+  censusInvoices    Census[]   @relation("CensusInvoice")
+}
+
+model AidTypeDocumentType {
+  aidTypeId      String
+  documentTypeId String
+  required       Boolean  @default(true)
+  aidType        AidType      @relation(fields: [aidTypeId], references: [id], onDelete: Cascade)
+  documentType   DocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@id([aidTypeId, documentTypeId])
+  @@index([aidTypeId])
+  @@index([documentTypeId])
+}
+
+model CensusDocument {
+  id             String        @id @default(uuid())
+  censusId       String
+  census         Census        @relation(fields: [censusId], references: [id], onDelete: Cascade)
+  kind           DocumentKind  @default(MEDICAL)
+  documentTypeId String?
+  documentType   DocumentType? @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+  fileName       String
+  filePath       String
+  mimeType       String
+  size           Int
+  uploadedAt     DateTime      @default(now())
+
+  @@index([censusId])
+  @@index([documentTypeId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId, createdAt])
+}

@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 {
+    @apply font-sans text-secondary;
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif text-secondary;
+  }
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply container mx-auto px-4 py-6;
+  }
+  .card {
+    @apply bg-white border border-border rounded-lg p-6 shadow-sm;
+  }
+  .input-base {
+    @apply flex h-11 w-full rounded-md border border-input bg-white px-3 py-2 text-base
+           placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed
+           disabled:opacity-50;
+  }
+  .label-base {
+    @apply text-sm font-medium text-secondary mb-1.5 block;
+  }
+  .help-text {
+    @apply text-xs text-muted-foreground mt-1;
+  }
+  .error-text {
+    @apply text-xs text-destructive mt-1;
+  }
+}

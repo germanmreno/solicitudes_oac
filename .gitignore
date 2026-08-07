@@ -1,0 +1,32 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Uploads (NUNCA versionar)
+backend/uploads/
+
+# Prisma
+backend/prisma/migrations/dev.db*
+
+# Vite / Cache
+frontend/.vite/
+frontend/dist/
+frontend/dev-dist/
+
+# Coverage
+coverage/
+
+# PWA generated
+frontend/public/sw.js
+frontend/public/workbox-*.js
+
+# Skills de agentes (no versionar)
+.agents/
+.kiro/
+skills-lock.json
