@@ -91,7 +91,15 @@ export async function refreshSession(refreshToken: string) {
     role: user.role,
   });
 
-  return { accessToken };
+  return {
+    accessToken,
+    user: {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+    },
+  };
 }
 
 export async function logoutUser(userId: string | undefined) {

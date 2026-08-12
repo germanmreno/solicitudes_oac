@@ -171,7 +171,7 @@ El PWA manifest (`frontend/vite.config.ts`) usa:
 - **Archivos en `uploads/`**: nunca versionar. Si un agente hace `git add .` sin revisar, los documentos de los censados se filtran al repo.
 - **CORS**: `CORS_ORIGIN` en `.env` debe coincidir exactamente con el origen del frontend (incluyendo puerto) o el refresh silencioso falla.
 - **Puerto 4700 ocupado en Windows**: si el dev server no arranca, buscar `node.exe` en el Administrador de tareas o cambiar `PORT` en `.env`.
-- **F5 en producción**: el access token está en memoria (Zustand). `RequireAuth` invoca `POST /auth/refresh` con la cookie httpOnly antes de cualquier render. Si la cookie está vencida, redirige a `/login`.
+- **F5 en producción**: el access token está en memoria (Zustand). `RequireAuth` invoca `POST /auth/refresh` con la cookie httpOnly antes de cualquier render. El refresh devuelve `{ accessToken, user }` y `RequireAuth`/el interceptor guardan **ambos** (`setSession`/`setUser`); sin el `user`, `RequireAdmin` y el nav del header quedan en blanco tras F5. Si la cookie está vencida, redirige a `/login`.
 
 ## Consulta pública (backend → `src/modules/public/`)
 - Endpoint **público** (sin `requireAuth`): `GET /api/v1/public/consulta?q=<cédula|N° expediente>`. Rate limit ~20/min/IP (mismo shape `{ error: { code, message } }` que login).

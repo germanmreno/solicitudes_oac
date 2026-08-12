@@ -55,8 +55,8 @@ authRoutes.post(
       });
       return;
     }
-    const { accessToken } = await refreshSession(token);
-    res.json({ data: { accessToken } });
+    const result = await refreshSession(token);
+    res.json({ data: result });
   }),
 );
 

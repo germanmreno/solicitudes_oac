@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '@/features/auth/auth.store';
+import { useAuthStore, type User } from '@/features/auth/auth.store';
 import { API_BASE, BASE_PATH } from './config';
 
 export const api = axios.create({
@@ -44,13 +44,14 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await axios.post<{ data: { accessToken: string } }>(
+        const { data } = await axios.post<{ data: { accessToken: string; user?: User } }>(
           `${API_BASE}/auth/refresh`,
           {},
           { withCredentials: true },
         );
         const newToken = data.data.accessToken;
         useAuthStore.getState().setAccessToken(newToken);
+        if (data.data.user) useAuthStore.getState().setUser(data.data.user);
         processQueue(newToken);
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
