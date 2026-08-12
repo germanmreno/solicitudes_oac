@@ -28,18 +28,21 @@ export function ImportPage() {
     mutation.mutate(file);
   }
 
-  function exportErrors() {
+  async function exportErrors() {
     if (!result || result.errors.length === 0) return;
-    const lines = ['Fila,Error', ...result.errors.map((e) => `${e.row},"${e.message.replace(/"/g, '""')}"`)];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'errores_importacion.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const { utils, writeFile } = await import('xlsx');
+    const rows = result.errors.map((e) => ({
+      'Fila CSV': e.row,
+      'N° expediente': e.fileNumber ?? '',
+      Solicitante: e.applicantName ?? '',
+      Cédula: e.applicantIdNumber ?? '',
+      Error: e.message,
+    }));
+    const ws = utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 9 }, { wch: 17 }, { wch: 34 }, { wch: 17 }, { wch: 70 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Errores');
+    writeFile(wb, 'errores_importacion.xlsx');
   }
 
   return (
@@ -101,6 +104,9 @@ export function ImportPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Fila</TableHead>
+                        <TableHead>N° expediente</TableHead>
+                        <TableHead>Solicitante</TableHead>
+                        <TableHead>Cédula</TableHead>
                         <TableHead>Error</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -108,6 +114,9 @@ export function ImportPage() {
                       {result.errors.slice(0, 100).map((e, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-mono text-xs">{e.row}</TableCell>
+                          <TableCell className="font-mono text-xs">{e.fileNumber ?? '—'}</TableCell>
+                          <TableCell className="text-sm">{e.applicantName ?? '—'}</TableCell>
+                          <TableCell className="font-mono text-xs">{e.applicantIdNumber ?? '—'}</TableCell>
                           <TableCell className="text-sm">{e.message}</TableCell>
                         </TableRow>
                       ))}
@@ -118,8 +127,8 @@ export function ImportPage() {
                       Mostrando 100 de {result.errors.length}. Use "Descargar errores" para el listado completo.
                     </p>
                   )}
-                  <Button variant="outline" size="sm" onClick={exportErrors}>
-                    <Download className="h-4 w-4 mr-2" /> Descargar errores
+                  <Button variant="outline" size="sm" onClick={() => void exportErrors()}>
+                    <Download className="h-4 w-4 mr-2" /> Descargar errores (Excel)
                   </Button>
                 </>
               )}

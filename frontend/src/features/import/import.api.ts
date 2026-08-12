@@ -1,9 +1,17 @@
 import { api } from '@/lib/api/client';
 
+export interface ImportError {
+  row: number;
+  fileNumber: string | null;
+  applicantName: string | null;
+  applicantIdNumber: string | null;
+  message: string;
+}
+
 export interface ImportResult {
   successCount: number;
   errorCount: number;
-  errors: { row: number; message: string }[];
+  errors: ImportError[];
 }
 
 export async function importCensusCsv(file: File): Promise<ImportResult> {

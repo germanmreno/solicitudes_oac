@@ -182,10 +182,18 @@ function detectDelimiter(buffer: Buffer): string {
   return top && top.n > 0 ? top.d : ',';
 }
 
+export interface ImportError {
+  row: number;
+  fileNumber: string | null;
+  applicantName: string | null;
+  applicantIdNumber: string | null;
+  message: string;
+}
+
 export interface ImportResult {
   successCount: number;
   errorCount: number;
-  errors: { row: number; message: string }[];
+  errors: ImportError[];
 }
 
 export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<ImportResult> {
@@ -241,11 +249,18 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
   for (const row of rows) {
     if (row === headerRow || row.every((c) => (c || '').trim() === '')) continue;
     rowNumber++;
+    let caseInfo = { fileNumber: null as string | null, applicantName: null as string | null, applicantIdNumber: null as string | null };
     try {
       const fields: Record<string, string> = {};
       header.forEach((key, i) => {
         if (key && row[i] !== undefined && (row[i] || '').trim() !== '') fields[key] = row[i].trim();
       });
+
+      caseInfo = {
+        fileNumber: (fields.fileNumber || '').trim() || null,
+        applicantName: (fields.applicantName || '').trim() || null,
+        applicantIdNumber: (fields.applicantIdNumber || '').trim() || null,
+      };
 
       const applicantName = (fields.applicantName || '').trim();
       const applicantIdNumber = normalizeCedula(fields.applicantIdNumber);
@@ -367,7 +382,11 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
       result.successCount++;
     } catch (err) {
       result.errorCount++;
-      result.errors.push({ row: rowNumber, message: err instanceof Error ? err.message : String(err) });
+      result.errors.push({
+        ...caseInfo,
+        row: rowNumber,
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
