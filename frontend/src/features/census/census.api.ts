@@ -8,8 +8,11 @@ export interface CensusListItem {
   applicantName: string;
   applicantIdNumber: string;
   applicantSex: 'MASCULINO' | 'FEMENINO';
+  applicantType: string | null;
+  personnelType: string | null;
   originType: { id: string; name: string; requiresSite: boolean };
   site: { id: string; name: string } | null;
+  externalOrigin: { id: string; name: string } | null;
   originDetail: string | null;
   beneficiarySameAsApplicant: boolean;
   beneficiaryName: string | null;
@@ -19,11 +22,15 @@ export interface CensusListItem {
   aidArea: { id: string; name: string; requiresDetail: boolean };
   aidAreaOther: string | null;
   aidDescription: string;
+  managementMode: string | null;
+  cooperatingEntity: string | null;
   aidStatus: 'ATENDIDO' | 'EN_PROCESO' | 'EN_EVALUACION' | 'NO_PROCEDE';
   idDocumentType: { id: string; name: string; code: string } | null;
   invoiceType: { id: string; name: string; code: string } | null;
   createdBy: { id: string; username: string; fullName: string };
   _count: { documents: number };
+  hasCedula: boolean;
+  hasCarta: boolean;
 }
 
 export interface CensusDocument {
@@ -50,6 +57,8 @@ export interface CensusDetail extends CensusListItem {
   paymentDate: string | null;
   paymentStatus: 'PENDIENTE' | 'PAGADO' | 'ANULADO' | null;
   invoicePath: string | null;
+  invoiceNote: string | null;
+  responsibleName: string | null;
   documents: CensusDocument[];
   createdAt: string;
   updatedAt: string;

@@ -6,15 +6,23 @@ import {
   listOriginTypes,
   createOriginType,
   updateOriginType,
+  deleteOriginType,
   listSites,
   createSite,
   updateSite,
+  deleteSite,
+  listExternalOrigins,
+  createExternalOrigin,
+  updateExternalOrigin,
+  deleteExternalOrigin,
   listAidTypes,
   createAidType,
   updateAidType,
+  deleteAidType,
   listAidAreas,
   createAidArea,
   updateAidArea,
+  deleteAidArea,
 } from './catalogs.service.js';
 import {
   createOriginTypeSchema,
@@ -44,6 +52,11 @@ catalogsRoutes.patch('/origin-types/:id', requireRole('ADMIN'), asyncHandler(asy
   res.json({ data: item });
 }));
 
+catalogsRoutes.delete('/origin-types/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  await deleteOriginType(req.params.id!, req.user!.sub);
+  res.json({ data: { ok: true } });
+}));
+
 catalogsRoutes.get('/sites', asyncHandler(async (req, res) => {
   const items = await listSites(req.query.all === '1');
   res.json({ data: items });
@@ -65,6 +78,37 @@ catalogsRoutes.patch('/sites/:id', requireRole('ADMIN'), asyncHandler(async (req
   res.json({ data: item });
 }));
 
+catalogsRoutes.delete('/sites/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  await deleteSite(req.params.id!, req.user!.sub);
+  res.json({ data: { ok: true } });
+}));
+
+catalogsRoutes.get('/external-origins', asyncHandler(async (req, res) => {
+  const items = await listExternalOrigins(req.query.all === '1');
+  res.json({ data: items });
+}));
+
+catalogsRoutes.post('/external-origins', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  const { name } = req.body as { name?: string };
+  if (!name || typeof name !== 'string' || name.trim().length < 2) {
+    res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'El nombre debe tener al menos 2 caracteres' } });
+    return;
+  }
+  const item = await createExternalOrigin({ name: name.trim() }, req.user!.sub);
+  res.status(201).json({ data: item });
+}));
+
+catalogsRoutes.patch('/external-origins/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  const data = updateCatalogSchema.parse(req.body);
+  const item = await updateExternalOrigin(req.params.id!, data, req.user!.sub);
+  res.json({ data: item });
+}));
+
+catalogsRoutes.delete('/external-origins/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  await deleteExternalOrigin(req.params.id!, req.user!.sub);
+  res.json({ data: { ok: true } });
+}));
+
 catalogsRoutes.get('/aid-types', asyncHandler(async (req, res) => {
   const items = await listAidTypes(req.query.all === '1');
   res.json({ data: items });
@@ -80,6 +124,11 @@ catalogsRoutes.patch('/aid-types/:id', requireRole('ADMIN'), asyncHandler(async 
   const data = updateCatalogSchema.parse(req.body);
   const item = await updateAidType(req.params.id!, data, req.user!.sub);
   res.json({ data: item });
+}));
+
+catalogsRoutes.delete('/aid-types/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  await deleteAidType(req.params.id!, req.user!.sub);
+  res.json({ data: { ok: true } });
 }));
 
 catalogsRoutes.get('/aid-areas', asyncHandler(async (req, res) => {
@@ -98,4 +147,9 @@ catalogsRoutes.patch('/aid-areas/:id', requireRole('ADMIN'), asyncHandler(async 
   const data = updateCatalogSchema.parse(req.body);
   const item = await updateAidArea(req.params.id!, data, req.user!.sub);
   res.json({ data: item });
+}));
+
+catalogsRoutes.delete('/aid-areas/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
+  await deleteAidArea(req.params.id!, req.user!.sub);
+  res.json({ data: { ok: true } });
 }));

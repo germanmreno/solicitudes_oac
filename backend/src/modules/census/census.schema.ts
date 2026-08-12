@@ -42,8 +42,11 @@ export const censusFormBaseSchema = z.object({
     .trim()
     .regex(cedulaRegex, 'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678'),
   applicantSex: sexSchema,
+  applicantType: optionalString,
+  personnelType: optionalString,
   originTypeId: z.string().uuid('Seleccione un tipo de procedencia'),
   siteId: z.string().uuid().nullable().optional(),
+  externalOriginId: z.string().uuid().nullable().optional(),
   originDetail: optionalString,
   phone: optionalString,
   email: z
@@ -70,6 +73,8 @@ export const censusFormBaseSchema = z.object({
   aidAreaId: z.string().uuid('Seleccione un área de ayuda'),
   aidAreaOther: optionalString,
   aidDescription: z.string().trim().min(2, 'La descripción es obligatoria'),
+  managementMode: optionalString,
+  cooperatingEntity: optionalString,
   aidStatus: aidStatusSchema.default('EN_EVALUACION'),
   aidProvider: optionalString,
   aidObservation: optionalString,
@@ -84,6 +89,8 @@ export const censusFormBaseSchema = z.object({
     .transform((v) => (v ? new Date(v) : undefined))
     .nullable(),
   paymentStatus: paymentStatusSchema.nullable().optional(),
+  invoiceNote: optionalString,
+  responsibleName: optionalString,
 });
 
 function refineCensus(

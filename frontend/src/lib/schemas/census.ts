@@ -44,8 +44,11 @@ export const censusFormSchema = z
     applicantName: z.string().trim().min(3, 'El nombre del solicitante es obligatorio'),
     applicantIdNumber: cedulaSchema,
     applicantSex: sexSchema,
+    applicantType: optionalString,
+    personnelType: optionalString,
     originTypeId: z.string().min(1, 'Seleccione un tipo de procedencia'),
     siteId: z.string().optional(),
+    externalOriginId: z.string().optional(),
     originDetail: optionalString,
     phone: optionalString,
     email: z
@@ -65,6 +68,8 @@ export const censusFormSchema = z
     aidAreaId: z.string().min(1, 'Seleccione un área de ayuda'),
     aidAreaOther: optionalString,
     aidDescription: z.string().trim().min(2, 'La descripción es obligatoria'),
+    managementMode: optionalString,
+    cooperatingEntity: optionalString,
     aidStatus: aidStatusSchema.default('EN_EVALUACION'),
     aidProvider: optionalString,
     aidObservation: optionalString,
@@ -74,6 +79,8 @@ export const censusFormSchema = z
     paymentRate: optionalDecimal,
     paymentDate: optionalString,
     paymentStatus: paymentStatusSchema.optional().or(z.literal('')).transform((v) => (v === '' ? undefined : v)),
+    invoiceNote: optionalString,
+    responsibleName: optionalString,
   })
   .superRefine((data, ctx) => {
     if (!data.beneficiarySameAsApplicant) {

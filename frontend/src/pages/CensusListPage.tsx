@@ -87,8 +87,32 @@ export function CensusListPage() {
     },
     {
       id: 'documents',
-      header: 'Docs',
-      cell: (row) => <span className="text-muted-foreground text-xs">{row._count?.documents ?? 0}</span>,
+      header: 'Documentos',
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 justify-end">
+          <span className="text-muted-foreground text-xs font-medium tabular-nums">{row._count?.documents ?? 0}</span>
+          <span
+            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium"
+            title="Cédula cargada"
+            aria-label={row.hasCedula ? 'Cédula cargada' : 'Sin cédula'}
+          >
+            <span aria-hidden className={row.hasCedula ? 'text-primary' : 'text-muted-foreground'}>
+              {row.hasCedula ? '✓' : '·'}
+            </span>
+            <span className={row.hasCedula ? 'text-foreground' : 'text-muted-foreground'}>C.I.</span>
+          </span>
+          <span
+            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium"
+            title="Carta de solicitud cargada"
+            aria-label={row.hasCarta ? 'Carta cargada' : 'Sin carta'}
+          >
+            <span aria-hidden className={row.hasCarta ? 'text-primary' : 'text-muted-foreground'}>
+              {row.hasCarta ? '✓' : '·'}
+            </span>
+            <span className={row.hasCarta ? 'text-foreground' : 'text-muted-foreground'}>Carta</span>
+          </span>
+        </div>
+      ),
       sortBy: (row) => row._count?.documents ?? 0,
       sortAscLabel: 'Documentos',
       align: 'right',

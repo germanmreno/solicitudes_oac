@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
 import { createCensus, getNextFileNumber } from '@/features/census/census.api';
-import { listOriginTypes, listSites, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
+import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import type { CatalogItem } from '@/features/catalogs/catalogs.api';
 import {
   listDocumentTypes,
@@ -56,6 +56,7 @@ export function CensusWizard() {
 
   const [originTypes, setOriginTypes] = useState<CatalogItem[]>([]);
   const [sites, setSites] = useState<CatalogItem[]>([]);
+  const [externalOrigins, setExternalOrigins] = useState<CatalogItem[]>([]);
   const [aidTypes, setAidTypes] = useState<CatalogItem[]>([]);
   const [aidAreas, setAidAreas] = useState<CatalogItem[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeItem[]>([]);
@@ -80,23 +81,27 @@ export function CensusWizard() {
   useEffect(() => {
     void (async () => {
       try {
-        const [ots, sts, ats] = await Promise.all([
+        const [ots, sts, exts, ats] = await Promise.all([
           listOriginTypes(),
           listSites(),
+          listExternalOrigins(),
           listAidTypes(),
         ]);
         setOriginTypes(ots);
         setSites(sts);
+        setExternalOrigins(exts);
         setAidTypes(ats);
         await db.catalogs.bulkPut([
           ...ots.map((o) => ({ ...o, type: 'originType' as const, active: true })),
           ...sts.map((s) => ({ ...s, type: 'site' as const, active: true })),
+          ...exts.map((e) => ({ ...e, type: 'externalOrigin' as const, active: true })),
           ...ats.map((a) => ({ ...a, type: 'aidType' as const, active: true })),
         ]);
       } catch {
         const cached = await db.catalogs.toArray();
         setOriginTypes(cached.filter((c) => c.type === 'originType'));
         setSites(cached.filter((c) => c.type === 'site'));
+        setExternalOrigins(cached.filter((c) => c.type === 'externalOrigin'));
         setAidTypes(cached.filter((c) => c.type === 'aidType'));
       }
     })();
@@ -132,7 +137,7 @@ export function CensusWizard() {
       const cached = await db.fileNumbers.toArray();
       const year = new Date().getFullYear();
       const row = cached.find((c) => c.year === year) || (await db.fileNumbers.put({ year, next: 1 }));
-      const next = `CVM-${year}-${String((row as { next: number }).next).padStart(5, '0')}`;
+      const next = `OAC-${String((row as { next: number }).next).padStart(4, '0')}-${year}`;
       form.setValue('fileNumber', next);
       if ((row as { next: number }).next) {
         await db.fileNumbers.update(year, { next: (row as { next: number }).next + 1 });
@@ -256,7 +261,7 @@ export function CensusWizard() {
                 <div>
                   <Label htmlFor="fileNumber">N° de expediente (Opcional)</Label>
                   <div className="flex gap-2">
-                    <Input id="fileNumber" placeholder="CVM-2026-00001" {...form.register('fileNumber')} />
+                    <Input id="fileNumber" placeholder="OAC-0001-2026" {...form.register('fileNumber')} />
                     <Button type="button" variant="outline" onClick={handleGenerateFileNumber}>
                       <Sparkles className="h-4 w-4 mr-1" /> Generar
                     </Button>
@@ -353,6 +358,28 @@ export function CensusWizard() {
                     {form.formState.errors.siteId && (
                       <p className="error-text">{form.formState.errors.siteId.message}</p>
                     )}
+                  </div>
+                )}
+
+                {selectedOriginType && !selectedOriginType.requiresSite && (
+                  <div>
+                    <Label>Procedencia externa</Label>
+                    <Controller
+                      control={form.control}
+                      name="externalOriginId"
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una procedencia externa" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {externalOrigins.map((e) => (
+                              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
                   </div>
                 )}
 

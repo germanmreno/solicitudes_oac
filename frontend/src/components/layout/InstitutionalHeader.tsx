@@ -98,6 +98,17 @@ export function InstitutionalHeader() {
                     Catálogos
                   </NavLink>
                   <NavLink
+                    to="/admin/import"
+                    end
+                    className={({ isActive }) =>
+                      `px-3 py-1.5 text-sm rounded-md whitespace-nowrap ${
+                        isActive ? 'bg-secondary text-secondary-foreground font-semibold' : 'text-foreground hover:bg-muted'
+                      }`
+                    }
+                  >
+                    Carga masiva
+                  </NavLink>
+                  <NavLink
                     to="/admin/users"
                     end
                     className={({ isActive }) =>

@@ -11,6 +11,9 @@ build/
 # Uploads (NUNCA versionar)
 backend/uploads/
 
+# Datos reales de prueba (contienen datos personales: NUNCA versionar)
+backend/test/*.csv
+
 # Prisma
 backend/prisma/migrations/dev.db*
 

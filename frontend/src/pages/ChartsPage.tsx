@@ -52,10 +52,10 @@ function makeBarOption(data: { name: string; count: number }[], title: string, h
 
 function makeMonthlyOption(data: StatsSummary['monthlyAmounts']): ECOption {
   return {
-    title: { text: 'Gastos mensuales', left: 'center', textStyle: { fontSize: 14 } },
+    title: { text: 'Gastos mensuales (pagado vs pendiente)', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
-    legend: { bottom: 0, data: ['USD', 'Bs.'] },
-    grid: { left: '3%', right: '8%', bottom: '20%', containLabel: true },
+    legend: { bottom: 0, data: ['Pagado USD', 'Pendiente USD', 'Pagado Bs.', 'Pendiente Bs.'] },
+    grid: { left: '3%', right: '8%', bottom: '25%', containLabel: true },
     xAxis: { type: 'category', data: data.map((d) => d.month) },
     yAxis: [
       { type: 'value', name: 'USD', position: 'left', axisLabel: { formatter: '${value}' } },
@@ -63,17 +63,35 @@ function makeMonthlyOption(data: StatsSummary['monthlyAmounts']): ECOption {
     ],
     series: [
       {
-        name: 'USD',
+        name: 'Pagado USD',
         type: 'bar',
-        data: data.map((d) => Number(d.amountUsd)),
+        stack: 'usd',
+        data: data.map((d) => Number(d.pagadoUsd)),
         itemStyle: { color: CVM_PALETTE[0] },
         yAxisIndex: 0,
       },
       {
-        name: 'Bs.',
+        name: 'Pendiente USD',
         type: 'bar',
-        data: data.map((d) => Number(d.amountBs)),
+        stack: 'usd',
+        data: data.map((d) => Number(d.pendienteUsd)),
+        itemStyle: { color: CVM_PALETTE[3] },
+        yAxisIndex: 0,
+      },
+      {
+        name: 'Pagado Bs.',
+        type: 'bar',
+        stack: 'bs',
+        data: data.map((d) => Number(d.pagadoBs)),
         itemStyle: { color: CVM_PALETTE[1] },
+        yAxisIndex: 1,
+      },
+      {
+        name: 'Pendiente Bs.',
+        type: 'bar',
+        stack: 'bs',
+        data: data.map((d) => Number(d.pendienteBs)),
+        itemStyle: { color: CVM_PALETTE[4] },
         yAxisIndex: 1,
       },
     ],
@@ -141,6 +159,25 @@ export function ChartsPage() {
             </Card>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagado USD</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-bold text-primary">{formatCurrency(stats.totals.pagadoUsd, 'USD')}</p></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pendiente USD</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-bold text-secondary">{formatCurrency(stats.totals.pendienteUsd, 'USD')}</p></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagado Bs.</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-bold text-primary">{formatCurrency(Number(stats.totals.pagadoBs), 'VES')}</p></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pendiente Bs.</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-bold text-secondary">{formatCurrency(Number(stats.totals.pendienteBs), 'VES')}</p></CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="pt-4">
@@ -154,6 +191,14 @@ export function ChartsPage() {
               <CardContent className="pt-4">
                 {stats.bySite.length > 0
                   ? <EChart option={makeBarOption(stats.bySite, 'Sedes más frecuentes')} height={280} />
+                  : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                {stats.byExternalOrigin.length > 0
+                  ? <EChart option={makePieOption(stats.byExternalOrigin, 'Procedencias externas')} height={280} />
                   : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
               </CardContent>
             </Card>

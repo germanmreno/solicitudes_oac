@@ -10,7 +10,7 @@ const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
   CORS_ORIGIN: z.string().min(1, 'CORS_ORIGIN es obligatorio'),
-  COOKIE_PATH: z.string().default('/api/v1/auth'),
+  COOKIE_PATH: z.string().default('/oac/api/v1/auth'),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_UPLOAD_MB: z.coerce.number().int().positive().default(10),
 });

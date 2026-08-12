@@ -22,7 +22,7 @@ export interface PendingMutation {
 
 export interface CachedCatalog {
   id: string;
-  type: 'originType' | 'site' | 'aidType' | 'aidArea';
+  type: 'originType' | 'site' | 'externalOrigin' | 'aidType' | 'aidArea';
   name: string;
   active: boolean;
   requiresSite?: boolean;

@@ -47,7 +47,7 @@ export function ConsultaPage() {
                   <Label htmlFor="q">N° de expediente o cédula</Label>
                   <Input
                     id="q"
-                    placeholder="Ej: CVM-2026-00001 o V-12345678"
+                    placeholder="Ej: OAC-0001-2026 o V-12345678"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     autoComplete="off"

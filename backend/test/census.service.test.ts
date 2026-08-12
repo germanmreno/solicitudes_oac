@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { generateFileNumber, listCensus } from '../src/modules/census/census.service.js';
 
 describe('census.service.generateFileNumber', () => {
-  it('generates a number in the CVM-YYYY-NNNNN format', async () => {
+  it('generates a number in the OAC-NNNN-YYYY format', async () => {
     const year = new Date().getFullYear();
     const num = await generateFileNumber(year);
-    expect(num).toMatch(new RegExp(`^CVM-${year}-\\d{5}$`));
+    expect(num).toMatch(new RegExp(`^OAC-\\d{4}-${year}$`));
   });
 });
 

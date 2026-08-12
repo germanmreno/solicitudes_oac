@@ -10,13 +10,7 @@ function toPublicPath(absolutePath: string): string {
   return path.relative(path.resolve(env.UPLOAD_DIR), absolutePath).split(path.sep).join('/');
 }
 
-const FILE_NUMBER_REGEX = /^CVM-\d{4}-\d{5}$/;
-
-const INITIAL_DOC_TYPE_BY_FIELD: Record<string, string> = {
-  idDocument: 'ID_DOCUMENT',
-  invoice: 'INVOICE',
-  medical: 'MEDICAL_REPORT',
-};
+const FILE_NUMBER_REGEX = /^OAC-\d{4}-\d{4}$/;
 
 async function findDocumentTypeByCode(code: string) {
   return prisma.documentType.findUnique({ where: { code, active: true } });
@@ -43,10 +37,13 @@ export async function generateFileNumber(year?: number): Promise<string> {
   const y = year ?? new Date().getFullYear();
   const count = await prisma.census.count({
     where: {
-      fileNumber: { startsWith: `CVM-${y}-` },
+      fileNumber: {
+        startsWith: 'OAC-',
+        endsWith: `-${y}`,
+      },
     },
   });
-  return `CVM-${y}-${String(count + 1).padStart(5, '0')}`;
+  return `OAC-${String(count + 1).padStart(4, '0')}-${y}`;
 }
 
 export async function reserveFileNumber(year?: number, maxAttempts = 10): Promise<string> {
@@ -70,6 +67,7 @@ const censusInclude = {
   createdBy: { select: { id: true, username: true, fullName: true } },
   originType: { select: { id: true, name: true, requiresSite: true } },
   site: { select: { id: true, name: true } },
+  externalOrigin: { select: { id: true, name: true } },
   aidType: { select: { id: true, name: true } },
   aidArea: { select: { id: true, name: true, requiresDetail: true } },
   idDocumentType: { select: { id: true, name: true, code: true } },
@@ -124,8 +122,28 @@ export async function listCensus(query: ListCensusQuery) {
     prisma.census.count({ where }),
   ]);
 
+  const ids = items.map((i) => i.id);
+  const [cartaDocs, cedulaRows] = await Promise.all([
+    ids.length
+      ? prisma.censusDocument.findMany({
+          where: { censusId: { in: ids }, documentType: { code: 'REQUEST_LETTER' } },
+          select: { censusId: true },
+        })
+      : [],
+    ids.length
+      ? prisma.census.findMany({ where: { id: { in: ids } }, select: { id: true, idDocumentPath: true } })
+      : [],
+  ]);
+  const cartaSet = new Set(cartaDocs.map((d) => d.censusId));
+  const cedulaSet = new Set(cedulaRows.filter((c) => c.idDocumentPath).map((c) => c.id));
+  const enriched = items.map((i) => ({
+    ...i,
+    hasCedula: cedulaSet.has(i.id),
+    hasCarta: cartaSet.has(i.id),
+  }));
+
   return {
-    items,
+    items: enriched,
     meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
@@ -163,6 +181,10 @@ export async function createCensus(
   if (input.siteId) {
     const site = await prisma.site.findUnique({ where: { id: input.siteId } });
     if (!site || !site.active) throw new AppError(400, 'INVALID_SITE', 'Sede no válida');
+  }
+  if (input.externalOriginId) {
+    const ext = await prisma.externalOrigin.findUnique({ where: { id: input.externalOriginId } });
+    if (!ext || !ext.active) throw new AppError(400, 'INVALID_EXTERNAL_ORIGIN', 'Procedencia externa no válida');
   }
 
   const aidArea = await prisma.aidArea.findUnique({
@@ -221,8 +243,11 @@ export async function createCensus(
       applicantName: input.applicantName,
       applicantIdNumber: input.applicantIdNumber.toUpperCase(),
       applicantSex: input.applicantSex as Sex,
+      applicantType: input.applicantType ?? null,
+      personnelType: input.personnelType ?? null,
       originTypeId: input.originTypeId,
       siteId: input.siteId ?? null,
+      externalOriginId: input.externalOriginId ?? null,
       originDetail: input.originDetail ?? null,
       phone: input.phone ?? null,
       email: input.email ?? null,
@@ -238,6 +263,8 @@ export async function createCensus(
       aidAreaId: input.aidAreaId,
       aidAreaOther: input.aidAreaOther ?? null,
       aidDescription: input.aidDescription,
+      managementMode: input.managementMode ?? null,
+      cooperatingEntity: input.cooperatingEntity ?? null,
       aidStatus: (input.aidStatus ?? 'EN_EVALUACION') as AidStatus,
       aidProvider: input.aidProvider ?? null,
       aidObservation: input.aidObservation ?? null,
@@ -249,6 +276,8 @@ export async function createCensus(
       paymentStatus: (input.paymentStatus as PaymentStatus) ?? null,
       invoicePath: publicPaths.invoice ?? null,
       invoiceTypeId: invDocType?.id ?? null,
+      invoiceNote: input.invoiceNote ?? null,
+      responsibleName: input.responsibleName ?? null,
 
       createdById: actorId,
 
@@ -291,6 +320,10 @@ export async function updateCensus(
     const site = await prisma.site.findUnique({ where: { id: input.siteId } });
     if (!site || !site.active) throw new AppError(400, 'INVALID_SITE', 'Sede no válida');
   }
+  if (input.externalOriginId != null) {
+    const ext = await prisma.externalOrigin.findUnique({ where: { id: input.externalOriginId } });
+    if (!ext || !ext.active) throw new AppError(400, 'INVALID_EXTERNAL_ORIGIN', 'Procedencia externa no válida');
+  }
 
   if (input.aidAreaId !== undefined) {
     const typeId = input.aidTypeId ?? current.aidTypeId;
@@ -313,8 +346,13 @@ export async function updateCensus(
   if (input.applicantName !== undefined) data.applicantName = input.applicantName;
   if (input.applicantIdNumber !== undefined) data.applicantIdNumber = input.applicantIdNumber.toUpperCase();
   if (input.applicantSex !== undefined) data.applicantSex = input.applicantSex as Sex;
+  if (input.applicantType !== undefined) data.applicantType = input.applicantType;
+  if (input.personnelType !== undefined) data.personnelType = input.personnelType;
   if (input.originTypeId !== undefined) data.originType = { connect: { id: input.originTypeId } };
   if (input.siteId !== undefined) data.site = input.siteId ? { connect: { id: input.siteId } } : { disconnect: true };
+  if (input.externalOriginId !== undefined) {
+    data.externalOrigin = input.externalOriginId ? { connect: { id: input.externalOriginId } } : { disconnect: true };
+  }
   if (input.originDetail !== undefined) data.originDetail = input.originDetail;
   if (input.phone !== undefined) data.phone = input.phone;
   if (input.email !== undefined) data.email = input.email;
@@ -326,6 +364,8 @@ export async function updateCensus(
   if (input.aidAreaId !== undefined) data.aidArea = { connect: { id: input.aidAreaId } };
   if (input.aidAreaOther !== undefined) data.aidAreaOther = input.aidAreaOther;
   if (input.aidDescription !== undefined) data.aidDescription = input.aidDescription;
+  if (input.managementMode !== undefined) data.managementMode = input.managementMode;
+  if (input.cooperatingEntity !== undefined) data.cooperatingEntity = input.cooperatingEntity;
   if (input.aidStatus !== undefined) data.aidStatus = input.aidStatus as AidStatus;
   if (input.aidProvider !== undefined) data.aidProvider = input.aidProvider;
   if (input.aidObservation !== undefined) data.aidObservation = input.aidObservation;
@@ -334,6 +374,8 @@ export async function updateCensus(
   if (input.paymentRate !== undefined) data.paymentRate = input.paymentRate;
   if (input.paymentDate !== undefined) data.paymentDate = input.paymentDate;
   if (input.paymentStatus !== undefined) data.paymentStatus = input.paymentStatus as PaymentStatus;
+  if (input.invoiceNote !== undefined) data.invoiceNote = input.invoiceNote;
+  if (input.responsibleName !== undefined) data.responsibleName = input.responsibleName;
   if (input.fileNumber !== undefined) {
     if (input.fileNumber && !FILE_NUMBER_REGEX.test(input.fileNumber)) {
       throw new AppError(400, 'INVALID_FILE_NUMBER', 'Formato de N° de expediente inválido');
@@ -360,11 +402,13 @@ export async function updateCensus(
       current as unknown as Record<string, unknown>,
       input as Record<string, unknown>,
       [
-        'applicantName', 'applicantIdNumber', 'applicantSex', 'originTypeId', 'siteId',
+        'applicantName', 'applicantIdNumber', 'applicantSex', 'applicantType', 'personnelType',
+        'originTypeId', 'siteId', 'externalOriginId',
         'originDetail', 'phone', 'email', 'beneficiarySameAsApplicant', 'beneficiaryName',
         'beneficiaryIdNumber', 'beneficiarySex', 'aidTypeId', 'aidAreaId', 'aidAreaOther',
-        'aidDescription', 'aidProvider', 'aidObservation', 'amountUsd', 'amountBs',
-        'paymentRate', 'paymentDate', 'paymentStatus', 'fileNumber',
+        'aidDescription', 'managementMode', 'cooperatingEntity',
+        'aidProvider', 'aidObservation', 'amountUsd', 'amountBs',
+        'paymentRate', 'paymentDate', 'paymentStatus', 'invoiceNote', 'responsibleName', 'fileNumber',
       ],
     );
     if (Object.keys(changedFields).length > 0) {

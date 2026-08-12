@@ -62,7 +62,7 @@ cp backend/.env.example backend/.env   # si existe; si no, crea backend/.env con
 | `PORT` | Puerto del backend | `4700` | `4700` |
 | `NODE_ENV` | Entorno | `development` | `production` |
 | `CORS_ORIGIN` | Origen exacto del frontend | `http://localhost:4701` | `https://cvm.com.ve` |
-| `COOKIE_PATH` | Path de la cookie de refresh. **Crítico bajo subpath**: debe coincidir con el path que ve el navegador | `/api/v1/auth` | **`/oac/api/v1/auth`** |
+| `COOKIE_PATH` | Path de la cookie de refresh. **Crítico bajo subpath**: debe coincidir con el path que ve el navegador | **`/oac/api/v1/auth`** | **`/oac/api/v1/auth`** |
 | `UPLOAD_DIR` | Carpeta de archivos subidos | `./uploads` | `./uploads` (con permiso de escritura) |
 | `MAX_UPLOAD_MB` | Tamaño máximo por archivo | `10` | `10` |
 
@@ -102,8 +102,10 @@ censo_cvm/
 ```
 
 ## Roles
-- **ADMIN**: ve todas las solicitudes, gestiona usuarios y catálogos (tipos de procedencia, sedes, tipos de ayuda, áreas, tipos de documento y sus requisitos), puede sobrescribir el N° de expediente.
+- **ADMIN**: ve todas las solicitudes, gestiona usuarios y catálogos (tipos de procedencia, sedes, tipos de ayuda, áreas, tipos de documento y sus requisitos), puede sobrescribir el N° de expediente y realizar **carga masiva CSV** (`/admin/import`).
 - **OPERATOR**: crea y edita solicitudes; ve los registros que él mismo creó (en MVP, ve todos).
+
+> **N° de expediente**: formato `OAC-NNNN-YYYY` (ej. `OAC-0001-2026`), autogenerado si se deja vacío. El import masivo conserva el valor del CSV tal cual.
 
 ## Soporte offline (PWA)
 - El service worker se activa automáticamente.

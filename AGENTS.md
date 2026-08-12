@@ -43,9 +43,11 @@
 
 ## Convenciones del proyecto
 - **Idioma**: todo el código visible para el usuario en español (`lang="es"`). Mensajes, validaciones, etiquetas, estados.
-- **Roles**: `ADMIN` y `OPERATOR`. Endpoints sensibles van con `requireRole('ADMIN')` en `backend/src/middlewares/role.ts`.
+- **Roles**: `ADMIN` y `OPERATOR`. Endpoints sensibles van con `requireRole('ADMIN')` en `backend/src/middlewares/role.ts`. `PATCH /census/:id` (edición de solicitud) es solo ADMIN.
 - **Errores**: respuesta uniforme `{ error: { code, message, details } }`. Handler global en `middlewares/error.ts`.
 - **Schemas Zod**: duplicados en `backend/src/modules/*/<feature>.schema.ts` y `frontend/src/lib/schemas/`. **Si modificas uno, replica en el otro** (no hay paquete compartido todavía).
+- **Lista de solicitudes**: `listCensus` devuelve por fila `hasCedula` (existe `idDocumentPath`) y `hasCarta` (existe un `CensusDocument` con `DocumentType.code = REQUEST_LETTER`), además de `_count.documents`. La tabla muestra la cantidad de documentos y badges C.I./Carta.
+- **Detalle de solicitud** (`CensusDetailPage`): documentos en una sección compacta con subida múltiple por tipo (selecciona el tipo → adjunta → cambia tipo por archivo si hace falta); el **pago** se confirma como paso (diálogo "Confirmar pago" → `PATCH /census/:id/payment` con `paymentStatus: PAGADO`), nunca se edita inline; si ya hay estatus de pago (p. ej. carga masiva) solo se muestra en el resumen. Botón "Editar" (ADMIN) abre `EditCensusDialog` que usa `censusFormSchema` y `updateCensus`.
 - **No commitear** sin pedido explícito del usuario. Tampoco modificar configuración de git.
 - **No agregar comentarios** en código salvo que el usuario lo pida.
 - **Auditoría**: usar `writeAudit` en TODA mutación sensible (cambio de estatus, edición de campos, upload/delete de documentos, cambios de pago, login). Los cambios a múltiples campos se persisten como `payload: { fields: { nombre: { from, to } } }` para reconstruir la línea de tiempo en el front.
@@ -53,37 +55,39 @@
 ## Validaciones críticas (no debilitar)
 - **Cédula**: regex `/^[VENE]-\d{6,8}$/i`. Acepta V, E, N (venezolano, extranjero, naturalizado). Mensaje: "Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678".
 - **Uploads**: máx 10 MB, mime `pdf|jpeg|jpg|png|webp`. Nombre en disco = UUID (nunca usar `originalname`). Carpetas: `ids/{yyyy}/{mm}/`, `invoices/{yyyy}/{mm}/`, `medical/{censusId}/`.
-- **N° de expediente**: formato `CVM-{YYYY}-{5 dígitos secuenciales}`, autogenerable vía `GET /api/v1/census/next-file-number`. Reinicia por año. Único, sobrescribible por admin.
+- **N° de expediente**: formato `OAC-NNNN-YYYY` (ej. `OAC-0001-2026`), autogenerable vía `GET /api/v1/census/next-file-number`. Reinicia por año. Único, sobrescribible por admin. La consulta pública acepta este formato.
 - **Sexo**: enum `Sex { MASCULINO, FEMENINO }`. Obligatorio en solicitante y beneficiario.
-- **Procedencia**: catálogo `OriginType` con flag `requiresSite`. Si `requiresSite` es true, el campo `siteId` es obligatorio. `originDetail` es texto libre opcional (comunidad).
+- **Procedencia**: catálogo `OriginType` con flag `requiresSite`. Si `requiresSite` es true (Interno), el campo `siteId` es obligatorio y apunta al catálogo `Site` (procedencias internas/sedes). Si es false (Externo), el campo `externalOriginId` apunta al catálogo `ExternalOrigin` (procedencias externas). `originDetail` es texto libre opcional (comunidad).
 - **Beneficiario**: si `beneficiarySameAsApplicant` es false, los campos `beneficiaryName`, `beneficiaryIdNumber` (regex cédula) y `beneficiarySex` son obligatorios.
 - **Tipo de ayuda**: catálogo `AidType`. **Área de ayuda**: catálogo `AidArea` FK a `AidType`. Si el área tiene `requiresDetail` true, `aidAreaOther` es obligatorio. Validación en service de que el área pertenece al tipo seleccionado.
-- **Documentos requeridos**: `AidTypeDocumentType` declara qué `DocumentType.code` es `required: true` para cada `aidTypeId`. Al **crear** una solicitud solo se valida la **cédula** (`ID_DOCUMENT`) como obligatoria (`AppError(400, 'MISSING_REQUIRED_DOCUMENT', …)`). Los demás documentos requeridos se muestran como recomendados y pueden adjuntarse después desde el detalle.
+- **Documentos requeridos**: `AidTypeDocumentType` declara qué `DocumentType.code` es `required: true` para cada `aidTypeId`. `REQUEST_LETTER` (Carta de solicitud) es obligatorio para todos los tipos de ayuda. Al **crear** una solicitud solo se valida la **cédula** (`ID_DOCUMENT`) como obligatoria (`AppError(400, 'MISSING_REQUIRED_DOCUMENT', …)`). Los demás documentos requeridos se muestran como recomendados y pueden adjuntarse después desde el detalle. La **carga masiva** no adjunta ni exige documentos.
 
 ## Modelo de datos
 ### Tablas
-- `User`, `OriginType`, `Site`, `AidType`, `AidArea`, `DocumentType`, `AidTypeDocumentType`, `Census`, `CensusDocument`, `AuditLog`.
+- `User`, `OriginType`, `Site`, `ExternalOrigin`, `AidType`, `AidArea`, `DocumentType`, `AidTypeDocumentType`, `Census`, `CensusDocument`, `AuditLog`.
 - `CensusDocument` tiene `kind: DocumentKind` (retrocompatibilidad) Y opcional `documentTypeId` apuntando a `DocumentType` (preferido).
 - `AuditLog`: `userId`, `action`, `entity`, `entityId`, `payload` (Json), `createdAt`. FK formal a `User` con `onDelete: SetNull`.
 - `AuditLog` registra: login, cambios de estatus, cambios por campo, uploads, deletes, CRUD de catálogos. **No omitir** `audit.service.writeAudit()` en acciones sensibles.
 
 ### Catálogos (data-driven, editables por admin)
 - **OriginType**: `name` único, `requiresSite` (boolean). Seed: Interno (requiresSite=true), Externo (requiresSite=false).
-- **Site**: `name` único. Sedes físicas. Seed vacío (las crea el admin).
+- **Site**: `name` único. Sedes físicas (procedencias internas). Seed vacío (las crea el admin o el import).
+- **ExternalOrigin**: `name` único. Procedencias externas (comunidades, organismos). Seed vacío (las crea el admin o el import).
 - **AidType**: `name` único. Seed: Social, Económica, Médica, Educacional.
 - **AidArea**: FK a `AidType`, `name`, `requiresDetail` boolean. Seed: 28 áreas médicas + 5 sociales + 5 económicas + 5 educacionales. @@unique([aidTypeId, name]).
-- **DocumentType** (nuevo): `name` único, `code` único, `requiredByDefault` boolean. Seed: ID_DOCUMENT, INVOICE, MEDICAL_REPORT, PROOF_OF_DELIVERY, SCHOLARSHIP_DOC, HOUSING_DOC, ECONOMIC_PROOF.
+- **DocumentType** (nuevo): `name` único, `code` único, `requiredByDefault` boolean. Seed: ID_DOCUMENT, INVOICE, MEDICAL_REPORT, PROOF_OF_DELIVERY, SCHOLARSHIP_DOC, HOUSING_DOC, ECONOMIC_PROOF, REQUEST_LETTER (Carta de solicitud, obligatorio para todos los tipos de ayuda).
 - **AidTypeDocumentType** (nuevo): PK compuesta (aidTypeId, documentTypeId), `required: boolean`. Seed: por cada AidType declara qué códigos de DocumentType son obligatorios.
 
 ### Census (campos clave)
-- `fileNumber` (CVM-YYYY-XXXXX), `registrationDate`.
+- `fileNumber` (OAC-NNNN-YYYY), `registrationDate`.
 - **Solicitante**: `applicantName`, `applicantIdNumber`, `applicantSex` (Sex).
-- **Procedencia**: `originTypeId` (FK OriginType), `siteId?` (FK Site), `originDetail?` (texto libre).
+- **Procedencia**: `originTypeId` (FK OriginType), `siteId?` (FK Site), `externalOriginId?` (FK ExternalOrigin), `originDetail?` (texto libre).
 - **Beneficiario**: `beneficiarySameAsApplicant` (default true), si false → `beneficiaryName?`, `beneficiaryIdNumber?`, `beneficiarySex?`.
 - **Ayuda**: `aidTypeId` (FK AidType), `aidAreaId` (FK AidArea), `aidAreaOther?` (obligatorio si área requiere detalle), `aidDescription`.
 - **Estatus**: `aidStatus` (enum), `aidProvider`, `aidObservation`, `amountUsd`, `amountBs`.
 - **Pago**: `paymentRate`, `paymentDate`, `paymentStatus`, `invoicePath`.
-- **Documentos**: `idDocumentPath` + `idDocumentTypeId?`, `invoicePath` + `invoiceTypeId?`, filas `CensusDocument` con `documentTypeId?`.
+- **Documentos**: columna `idDocumentPath` + filas `CensusDocument` (kind MEDICAL/INVOICE).
+- **Campos administrativos** (importados o manuales, opcionales): `applicantType` (TIPO DE SOLICITANTE), `personnelType` (TIPO DE PERSONAL), `managementMode` (MODALIDAD DE GESTION), `cooperatingEntity` (ENTE U ORGANISMO COOPERANTE), `responsibleName` (RESPONSABLE original, texto; `createdById` sigue siendo quien registra), `invoiceNote` (FACTURA, descripción; `invoicePath` es el archivo en disco).
 - FKs: `createdById` → User.
 
 ## Auditoría y línea de tiempo
@@ -100,10 +104,19 @@
 - Estrategia: `NetworkFirst` para `GET /census/*`, `CacheFirst` para `GET /api/v1/catalogs/*` y `GET /api/v1/document-types/*` (cambian rarísimo), nunca cachear `POST/PATCH`, ni `/api/v1/stats/*`, ni `/api/v1/audit/*`.
 
 ## Catálogos (backend → `src/modules/catalogs/`)
-- Módulo Express con rutas `GET /api/v1/catalogs/origin-types`, `/sites`, `/aid-types`, `/aid-areas?typeId=`. Todos autenticados.
+- Módulo Express con rutas `GET /api/v1/catalogs/origin-types`, `/sites`, `/external-origins`, `/aid-types`, `/aid-areas?typeId=`. Todos autenticados.
 - POST/PATCH de cada catálogo requiere `requireRole('ADMIN')`. No hay DELETE físico: se usa flag `active` con default `true`.
+- **DELETE** (`DELETE /catalogs/<colección>/:id`, ADMIN): solo permite eliminar si el elemento **no está referenciado** por registros (`Census`) o, en el caso de `aid-types`, si no tiene `AidArea` hijas. Si está en uso → `AppError(409, 'IN_USE' | 'HAS_CHILDREN')` con el conteo. Registra `DELETE_CATALOG_ITEM`.
 - Cada creación/actualización registra `writeAudit(action: 'CREATE_CATALOG_ITEM' | 'UPDATE_CATALOG_ITEM')`.
 - **Validaciones cruzadas en census service** (no en Zod, porque requieren BD): el área debe pertenecer al tipo de ayuda seleccionado; si `originType.requiresSite` → `siteId` obligatorio; si `aidArea.requiresDetail` → `aidAreaOther` obligatorio; `AidTypeDocumentType` con `required: true` → `documentTypeId` obligatorio (frontend lo valida y backend lo confirma).
+
+## Carga masiva (backend → `src/modules/import/`)
+- Dependencia: `csv-parse` (workspace backend).
+- `POST /api/v1/import/census` (ADMIN, multipart `file`): importa solicitudes desde un CSV. El delimitador se autodetecta (`,` `;` `\t`). Devuelve `{ data: { successCount, errorCount, errors: [{ row, message }] } }`. El encabezado se detecta como la fila con más columnas reconocidas (tolera filas de título/preámbulo). Auto-crea catálogos que falten: sedes (`Site`), procedencias externas (`OriginType`) y áreas (`AidArea`); los reutiliza en importaciones posteriores.
+- `GET /api/v1/import/template` (ADMIN): descarga la plantilla CSV con los encabezados esperados.
+- **Mapeo de encabezados** (normalizado sin tildes/espacios): ver `HEADER_MAP` en `import.service.ts`. Columnas: FECHA, NRO DE EXPEDIENTE, SOLICITANTE, CÉDULA DE IDENTIDAD, TIPO DE SEXO SOLICITANTE, BENEFICIARIO, TIPO DE SEXO BENEFICIARIO, PROCEDENCIA, TELÉFONO, TIPO DE SOLICITANTE, TIPO DE PERSONAL, TIPO DE AYUDA, DESCRIPCION, ESPECIALIDAD, NO PROCEDE, MODALIDAD DE GESTION, ENTE U ORGANISMO COOPERANTE, PROVEEDOR, OBSERVACION, RESPONSABLE, MONTO $, MONTO BS, TASA, FECHA DE PAGO, ESTATUS, FACTURA.
+- Reglas: cédula obligatoria con `cedulaRegex` (se normaliza: espacios, puntos y prefijo `C.I.`); sexo normaliza M/F/MASCULINO/FEMENINO; `TIPO DE SOLICITANTE` = INTERNO → `PROCEDENCIA` es la **sede** (se auto-crea en catálogo `Site` y se asigna `siteId`, alimenta las stats por sede); `TIPO DE SOLICITANTE` = EXTERNO → `PROCEDENCIA` se auto-crea en el catálogo `ExternalOrigin` (catálogo separado) y se asigna `externalOriginId`; `TIPO DE AYUDA` se clasifica a Médica/Social por palabra clave y el valor original va a `aidAreaOther`; `ESPECIALIDAD` faltante se auto-crea como área del tipo mapeado; `ESTATUS`/`NO PROCEDE` alimentan `aidStatus` y `paymentStatus`; montos formato español (`5.000,00`→5000); `fileNumber` presente se usa **tal cual** (nunca se reemplaza; si no es `OAC-NNNN-YYYY` la fila se rechaza), solo se autogenera si la celda está vacía.
+- Frontend: `ImportPage` en `/admin/import` (subida, resumen, descarga de errores).
 
 ## Tipos de documento (backend → `src/modules/documentTypes/`)
 - Módulo Express con rutas `GET /api/v1/document-types?aidTypeId=`, `POST /api/v1/document-types`, `PATCH /api/v1/document-types/:id`, `POST /api/v1/document-types/links`, `PATCH/DELETE /api/v1/document-types/links/:aidTypeId/:documentTypeId`. Todas autenticadas; POST/PATCH requieren ADMIN.
@@ -123,11 +136,11 @@
 - **Página** `frontend/src/pages/ChartsPage.tsx`:
   - Ruta `/charts`, accesible por todo usuario autenticado.
   - Filtro de rango de fechas (from/to) que alimenta `GET /api/v1/stats/summary`.
-  - KPIs: total de solicitudes, monto total USD, monto total Bs.
-  - Gráficos: Pie de procedencias (por tipo), Bar de sedes más frecuentes, Bar horizontal de áreas/especialidades más atendidas, Bar/Line de gastos mensuales (USD + Bs, dos series), Pie por tipo de ayuda.
+  - KPIs: total de solicitudes, monto total USD, monto total Bs, más el desglose de pagos: Pagado USD, Pendiente USD, Pagado Bs., Pendiente Bs.
+  - Gráficos: Pie de procedencias (por tipo), Bar de sedes más frecuentes (internas), Pie de procedencias externas, Bar horizontal de áreas/especialidades más atendidas, Bar apilado de gastos mensuales (Pagado vs Pendiente, en USD y Bs.), Pie por tipo de ayuda.
   - Paleta CVM: `['#638c3a', '#1e3a6b', '#E8DCC4', '#C98A2B', '#3F8F4F', '#B23A3A', '#8FA463', '#4A6FA5']`.
   - Estado vacío: "Sin datos en el rango seleccionado".
-- **Endpoint backend**: `GET /api/v1/stats/summary?from=&to=` → `{ byOriginType[], bySite[], byAidType[], topAidAreas[], monthlyAmounts[], totals }`. Implementación con Prisma `groupBy` + `$queryRaw` (`date_trunc('month', registrationDate)`). Sumas excluyen `paymentStatus = ANULADO` mediante `IS NULL OR <> 'ANULADO'`. `from` y `to` aceptan tanto `YYYY-MM-DD` como ISO completo: se detecta el formato y se ajusta el fin del día a `T23:59:59.999Z`.
+- **Endpoint backend**: `GET /api/v1/stats/summary?from=&to=` → `{ byOriginType[], bySite[], byExternalOrigin[], byAidType[], topAidAreas[], monthlyAmounts[], totals }`. Implementación con Prisma `groupBy` + `$queryRaw` (`date_trunc('month', registrationDate)`). Las sumas distinguen **pagado vs pendiente** (`paymentStatus = 'PAGADO'` vs `IS DISTINCT FROM 'PAGADO'`) en USD y Bs. **Se excluye** `aidStatus = NO_PROCEDE` (no forma parte de la estadística) y `paymentStatus = ANULADO`. `from` y `to` aceptan tanto `YYYY-MM-DD` como ISO completo: se detecta el formato y se ajusta el fin del día a `T23:59:59.999Z`.
 - **PWA**: `/stats/*` sin caché (NetworkOnly); los catálogos que alimentan los selects del wizard se cachean con CacheFirst via Workbox.
 - **Nav**: enlace "Gráficos" en `InstitutionalHeader` (todos los usuarios autenticados).
 
@@ -162,7 +175,7 @@ El PWA manifest (`frontend/vite.config.ts`) usa:
 
 ## Consulta pública (backend → `src/modules/public/`)
 - Endpoint **público** (sin `requireAuth`): `GET /api/v1/public/consulta?q=<cédula|N° expediente>`. Rate limit ~20/min/IP (mismo shape `{ error: { code, message } }` que login).
-- `q` con formato `CVM-YYYY-NNNNN` → busca por `fileNumber` (único). `q` con formato cédula (`cedulaRegex`) → busca el registro más reciente por `applicantIdNumber`.
+- `q` con formato `OAC-NNNN-YYYY` → busca por `fileNumber` (único). `q` con formato cédula (`cedulaRegex`) → busca el registro más reciente por `applicantIdNumber`.
 - Formato inválido → `400 INVALID_QUERY`; no encontrado → `404 NOT_FOUND` con **mensaje genérico** (anti-enumeración).
 - **Privacidad**: responde solo `{ fileNumber, aidStatus, aidObservation, aidType.name, aidArea.name, updatedAt }`. Nunca nombre, cédula, montos ni documentos.
 - **Frontend**: ruta pública `/consulta` (`pages/ConsultaPage.tsx`, fuera de `RequireAuth`). Enlazada desde `LoginPage`. Header público compartido en `components/layout/PublicHeader.tsx`.

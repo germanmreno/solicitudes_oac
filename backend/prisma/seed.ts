@@ -54,13 +54,14 @@ const DOCUMENT_TYPES_SEED = [
   { code: 'SCHOLARSHIP_DOC',   name: 'Documento de beca',              requiredByDefault: false },
   { code: 'HOUSING_DOC',       name: 'Documento de vivienda',          requiredByDefault: false },
   { code: 'ECONOMIC_PROOF',    name: 'Comprobante económico',          requiredByDefault: false },
+  { code: 'REQUEST_LETTER',    name: 'Carta de solicitud',             requiredByDefault: true },
 ];
 
 const DOC_REQUIREMENTS = {
-  'Médica':      ['ID_DOCUMENT', 'MEDICAL_REPORT', 'INVOICE'],
-  'Social':      ['ID_DOCUMENT', 'PROOF_OF_DELIVERY'],
-  'Económica':   ['ID_DOCUMENT', 'ECONOMIC_PROOF', 'INVOICE'],
-  'Educacional': ['ID_DOCUMENT', 'SCHOLARSHIP_DOC'],
+  'Médica':      ['ID_DOCUMENT', 'REQUEST_LETTER', 'MEDICAL_REPORT', 'INVOICE'],
+  'Social':      ['ID_DOCUMENT', 'REQUEST_LETTER', 'PROOF_OF_DELIVERY'],
+  'Económica':   ['ID_DOCUMENT', 'REQUEST_LETTER', 'ECONOMIC_PROOF', 'INVOICE'],
+  'Educacional': ['ID_DOCUMENT', 'REQUEST_LETTER', 'SCHOLARSHIP_DOC'],
 };
 
 async function main() {

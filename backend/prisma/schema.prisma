@@ -52,6 +52,14 @@ model Site {
   census    Census[]
 }
 
+model ExternalOrigin {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  census    Census[]
+}
+
 model AidType {
   id          String   @id @default(uuid())
   name        String   @unique
@@ -97,10 +105,14 @@ model Census {
   applicantName               String
   applicantIdNumber           String
   applicantSex                Sex
+  applicantType               String?
+  personnelType               String?
   originTypeId                String
   originType                  OriginType     @relation(fields: [originTypeId], references: [id])
   siteId                      String?
   site                        Site?          @relation(fields: [siteId], references: [id])
+  externalOriginId            String?
+  externalOrigin              ExternalOrigin? @relation(fields: [externalOriginId], references: [id], onDelete: SetNull)
   originDetail                String?
   phone                       String?
   email                       String?
@@ -119,6 +131,8 @@ model Census {
   aidArea                     AidArea        @relation(fields: [aidAreaId], references: [id])
   aidAreaOther                String?
   aidDescription              String
+  managementMode              String?
+  cooperatingEntity           String?
 
   aidStatus                   AidStatus      @default(EN_EVALUACION)
   aidProvider                 String?
@@ -132,6 +146,8 @@ model Census {
   invoicePath                 String?
   invoiceTypeId               String?
   invoiceType                 DocumentType? @relation("CensusInvoice", fields: [invoiceTypeId], references: [id], onDelete: SetNull)
+  invoiceNote                 String?
+  responsibleName             String?
 
   createdById                 String
   createdBy                   User           @relation("CreatedBy", fields: [createdById], references: [id])
@@ -145,6 +161,7 @@ model Census {
   @@index([createdById])
   @@index([originTypeId])
   @@index([siteId])
+  @@index([externalOriginId])
   @@index([aidTypeId])
   @@index([aidAreaId])
 }

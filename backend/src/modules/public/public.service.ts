@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middlewares/error.js';
 import { cedulaRegex } from '../auth/auth.schema.js';
 
-const FILE_NUMBER_REGEX = /^CVM-\d{4}-\d{5}$/i;
+const FILE_NUMBER_REGEX = /^OAC-\d{4}-\d{4}$/i;
 
 export async function consultarEstatus(q: string) {
   let census;
@@ -28,7 +28,7 @@ export async function consultarEstatus(q: string) {
     throw new AppError(
       400,
       'INVALID_QUERY',
-      'Formato no válido. Use un N° de expediente (CVM-2026-00001) o una cédula (V-12345678).',
+      'Formato no válido. Use un N° de expediente (OAC-0001-2026) o una cédula (V-12345678).',
     );
   }
 

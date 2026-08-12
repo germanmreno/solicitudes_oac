@@ -18,6 +18,7 @@ export interface DocumentUploaderProps {
   onChange: (files: UploadedFileMeta[]) => void;
   error?: string;
   documentTypeId?: string | null;
+  compact?: boolean;
 }
 
 export function DocumentUploader({
@@ -29,6 +30,7 @@ export function DocumentUploader({
   onChange,
   error,
   documentTypeId = null,
+  compact = false,
 }: DocumentUploaderProps) {
   const onDrop = React.useCallback(
     (accepted: File[], rejected: FileRejection[]) => {
@@ -73,19 +75,28 @@ export function DocumentUploader({
       <div
         {...getRootProps()}
         className={cn(
-          'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+          'border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors',
+          compact ? 'p-2' : 'p-6',
           isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50',
           error && 'border-destructive',
         )}
       >
         <input {...getInputProps()} />
-        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">
-          {isDragActive
-            ? 'Suelte los archivos aquí'
-            : 'Arrastre archivos o haga clic para seleccionarlos'}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG, WebP. Máximo {maxSizeMb} MB.</p>
+        {compact ? (
+          <p className="text-xs text-muted-foreground">
+            {isDragActive ? 'Suelte los archivos aquí' : 'Arrastre o haga clic para adjuntar'}
+          </p>
+        ) : (
+          <>
+            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {isDragActive
+                ? 'Suelte los archivos aquí'
+                : 'Arrastre archivos o haga clic para seleccionarlos'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG, WebP. Máximo {maxSizeMb} MB.</p>
+          </>
+        )}
       </div>
       {error && <p className="error-text">{error}</p>}
 

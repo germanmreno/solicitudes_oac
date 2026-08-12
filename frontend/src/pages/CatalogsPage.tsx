@@ -1,46 +1,66 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Plus, Pencil, Check, X } from 'lucide-react';
+import { Loader2, Plus, Pencil, Check, X, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api, getErrorMessage } from '@/lib/api/client';
-import { listOriginTypes, listSites, listAidTypes } from '@/features/catalogs/catalogs.api';
+import {
+  listOriginTypes,
+  listSites,
+  listExternalOrigins,
+  listAidTypes,
+  listAidAreas,
+} from '@/features/catalogs/catalogs.api';
 import type { CatalogItem } from '@/features/catalogs/catalogs.api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 
 interface EditableRowProps {
   item: CatalogItem;
   onSave: (id: string, data: Record<string, unknown>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
 
-function EditableRow({ item, onSave }: EditableRowProps) {
+function EditableRow({ item, onSave, onDelete }: EditableRowProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (!name.trim() || name.trim().length < 2) return;
-    setSaving(true);
+    setBusy(true);
     try {
       await onSave(item.id, { name: name.trim() });
       setEditing(false);
     } catch (err) {
       toast.error(getErrorMessage(err, 'No se pudo guardar'));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }, [name, item.id, onSave]);
+
+  const handleDelete = useCallback(async () => {
+    if (!confirm(`¿Eliminar "${item.name}"? Esta acción no se puede deshacer.`)) return;
+    setBusy(true);
+    try {
+      await onDelete(item.id);
+      toast.success('Elemento eliminado');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo eliminar'));
+    } finally {
+      setBusy(false);
+    }
+  }, [item.name, item.id, onDelete]);
 
   return (
     <TableRow>
       <TableCell>
         {editing ? (
-          <div className="flex items-center gap-2">
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-sm" />
-          </div>
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-sm" />
         ) : (
           <span className={item.active ? '' : 'text-muted-foreground line-through'}>{item.name}</span>
         )}
@@ -48,8 +68,8 @@ function EditableRow({ item, onSave }: EditableRowProps) {
       <TableCell className="text-right">
         {editing ? (
           <div className="flex gap-1 justify-end">
-            <Button size="sm" variant="ghost" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}
+            <Button size="sm" variant="ghost" onClick={handleSave} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => { setName(item.name); setEditing(false); }}>
               <X className="h-4 w-4 text-destructive" />
@@ -60,6 +80,9 @@ function EditableRow({ item, onSave }: EditableRowProps) {
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
+            <Button size="sm" variant="ghost" onClick={handleDelete} disabled={busy} title="Eliminar">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
           </div>
         )}
       </TableCell>
@@ -68,17 +91,19 @@ function EditableRow({ item, onSave }: EditableRowProps) {
 }
 
 function CatalogManager({
-  title,
   items,
   onAdd,
   onSave,
+  onDelete,
   placeholder,
+  extraNewFields,
 }: {
-  title: string;
   items: CatalogItem[];
   onAdd: (data: Record<string, string | boolean>) => Promise<void>;
   onSave: (id: string, data: Record<string, unknown>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   placeholder?: string;
+  extraNewFields?: React.ReactNode;
 }) {
   const qc = useQueryClient();
   const [newName, setNewName] = useState('');
@@ -90,13 +115,13 @@ function CatalogManager({
     try {
       await onAdd({ name: newName.trim() });
       setNewName('');
-      void qc.invalidateQueries({ queryKey: [title] });
+      void qc.invalidateQueries();
     } catch (err) {
       toast.error(getErrorMessage(err, 'No se pudo crear'));
     } finally {
       setSaving(false);
     }
-  }, [newName, onAdd, qc, title]);
+  }, [newName, onAdd, qc]);
 
   return (
     <div>
@@ -107,6 +132,7 @@ function CatalogManager({
           onChange={(e) => setNewName(e.target.value)}
           className="max-w-xs"
         />
+        {extraNewFields}
         <Button size="sm" onClick={handleAdd} disabled={saving || !newName.trim()}>
           {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
           Añadir
@@ -125,7 +151,7 @@ function CatalogManager({
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <EditableRow key={item.id} item={item} onSave={onSave} />
+              <EditableRow key={item.id} item={item} onSave={onSave} onDelete={onDelete} />
             ))}
           </TableBody>
         </Table>
@@ -136,6 +162,7 @@ function CatalogManager({
 
 export function CatalogsPage() {
   const qc = useQueryClient();
+  const [selectedTypeId, setSelectedTypeId] = useState('');
 
   const { data: originTypes = [] } = useQuery({
     queryKey: ['origin-types'],
@@ -149,15 +176,28 @@ export function CatalogsPage() {
     staleTime: 1000 * 60,
   });
 
+  const { data: externalOrigins = [] } = useQuery({
+    queryKey: ['external-origins'],
+    queryFn: () => listExternalOrigins(),
+    staleTime: 1000 * 60,
+  });
+
   const { data: aidTypes = [] } = useQuery({
     queryKey: ['aid-types'],
     queryFn: () => listAidTypes(),
     staleTime: 1000 * 60,
   });
 
-  function makeOnAdd(url: string) {
+  const { data: aidAreas = [] } = useQuery({
+    queryKey: ['aid-areas', selectedTypeId],
+    queryFn: () => listAidAreas(selectedTypeId || undefined),
+    enabled: !!selectedTypeId,
+    staleTime: 1000 * 60,
+  });
+
+  function makeOnAdd(baseUrl: string, extra?: Record<string, string>) {
     return async (data: Record<string, string | boolean>) => {
-      await api.post(url, data);
+      await api.post(baseUrl, { ...data, ...extra });
       toast.success('Elemento creado');
       invalidateAll();
     };
@@ -171,10 +211,19 @@ export function CatalogsPage() {
     };
   }
 
+  function makeOnDelete(baseUrl: string) {
+    return async (id: string) => {
+      await api.delete(`${baseUrl}/${id}`);
+      invalidateAll();
+    };
+  }
+
   function invalidateAll() {
     void qc.invalidateQueries({ queryKey: ['origin-types'] });
     void qc.invalidateQueries({ queryKey: ['sites'] });
+    void qc.invalidateQueries({ queryKey: ['external-origins'] });
     void qc.invalidateQueries({ queryKey: ['aid-types'] });
+    void qc.invalidateQueries({ queryKey: ['aid-areas'] });
   }
 
   return (
@@ -185,8 +234,10 @@ export function CatalogsPage() {
       <Tabs defaultValue="origin-types">
         <TabsList>
           <TabsTrigger value="origin-types">Tipos de procedencia</TabsTrigger>
-          <TabsTrigger value="sites">Sedes</TabsTrigger>
+          <TabsTrigger value="sites">Procedencias internas (Sedes)</TabsTrigger>
+          <TabsTrigger value="external-origins">Procedencias externas</TabsTrigger>
           <TabsTrigger value="aid-types">Tipos de ayuda</TabsTrigger>
+          <TabsTrigger value="aid-areas">Áreas de ayuda</TabsTrigger>
         </TabsList>
 
         <TabsContent value="origin-types">
@@ -194,10 +245,10 @@ export function CatalogsPage() {
             <CardHeader><CardTitle>Tipos de procedencia</CardTitle></CardHeader>
             <CardContent>
               <CatalogManager
-                title="origin-types"
                 items={originTypes}
                 onAdd={makeOnAdd('/catalogs/origin-types')}
                 onSave={makeOnSave('/catalogs/origin-types')}
+                onDelete={makeOnDelete('/catalogs/origin-types')}
                 placeholder="Ej: Interno"
               />
             </CardContent>
@@ -206,14 +257,29 @@ export function CatalogsPage() {
 
         <TabsContent value="sites">
           <Card>
-            <CardHeader><CardTitle>Sedes</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Procedencias internas (Sedes)</CardTitle></CardHeader>
             <CardContent>
               <CatalogManager
-                title="sites"
                 items={sites}
                 onAdd={makeOnAdd('/catalogs/sites')}
                 onSave={makeOnSave('/catalogs/sites')}
+                onDelete={makeOnDelete('/catalogs/sites')}
                 placeholder="Ej: Sede Bolívar"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="external-origins">
+          <Card>
+            <CardHeader><CardTitle>Procedencias externas</CardTitle></CardHeader>
+            <CardContent>
+              <CatalogManager
+                items={externalOrigins}
+                onAdd={makeOnAdd('/catalogs/external-origins')}
+                onSave={makeOnSave('/catalogs/external-origins')}
+                onDelete={makeOnDelete('/catalogs/external-origins')}
+                placeholder="Ej: Comunidad Nueva Jerusalén"
               />
             </CardContent>
           </Card>
@@ -224,12 +290,43 @@ export function CatalogsPage() {
             <CardHeader><CardTitle>Tipos de ayuda</CardTitle></CardHeader>
             <CardContent>
               <CatalogManager
-                title="aid-types"
                 items={aidTypes}
                 onAdd={makeOnAdd('/catalogs/aid-types')}
                 onSave={makeOnSave('/catalogs/aid-types')}
+                onDelete={makeOnDelete('/catalogs/aid-types')}
                 placeholder="Ej: Social"
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="aid-areas">
+          <Card>
+            <CardHeader><CardTitle>Áreas de ayuda</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="max-w-xs">
+                <Label htmlFor="area-type-filter">Tipo de ayuda</Label>
+                <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                  <SelectTrigger id="area-type-filter">
+                    <SelectValue placeholder="Seleccione un tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {aidTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedTypeId && (
+                <CatalogManager
+                  items={aidAreas}
+                  onAdd={makeOnAdd('/catalogs/aid-areas', { aidTypeId: selectedTypeId })}
+                  onSave={makeOnSave('/catalogs/aid-areas')}
+                  onDelete={makeOnDelete('/catalogs/aid-areas')}
+                  placeholder="Ej: Cardiología"
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

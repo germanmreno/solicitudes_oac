@@ -11,6 +11,7 @@ import { CensusDetailPage } from '@/pages/CensusDetailPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { CatalogsPage } from '@/pages/CatalogsPage';
+import { ImportPage } from '@/pages/ImportPage';
 import { ChartsPage } from '@/pages/ChartsPage';
 import { CensusWizard } from '@/components/forms/CensusWizard';
 import { setupAutoSync } from '@/lib/offline/queue';
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
               <Route path="/admin/catalogs" element={<CatalogsPage />} />
+              <Route path="/admin/import" element={<ImportPage />} />
             </Route>
           </Route>
         </Route>
