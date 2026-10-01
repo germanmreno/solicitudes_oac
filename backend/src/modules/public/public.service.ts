@@ -2,10 +2,12 @@ import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middlewares/error.js';
 import { cedulaRegex } from '../auth/auth.schema.js';
 
-const FILE_NUMBER_REGEX = /^OAC-\d{4}-\d{4}$/i;
+const FILE_NUMBER_REGEX = /^OAC-\d{4}(?:-\d+)?-\d{4}$/i;
 
 export async function consultarEstatus(q: string) {
   let census;
+
+  q = q.replace(/\s+/g, '').toUpperCase();
 
   if (FILE_NUMBER_REGEX.test(q)) {
     census = await prisma.census.findUnique({

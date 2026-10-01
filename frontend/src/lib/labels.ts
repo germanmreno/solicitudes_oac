@@ -17,3 +17,11 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PAGADO: 'Pagado',
   ANULADO: 'Anulado',
 };
+
+export const SEX_LABELS: Record<string, string> = {
+  MASCULINO: 'Masculino',
+  FEMENINO: 'Femenino',
+  NO_APLICA: 'No aplica',
+  'N/A': 'No aplica',
+  'N/P': 'No posee',
+};

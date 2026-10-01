@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input, Textarea } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DocumentUploader, type UploadedFileMeta } from '@/components/forms/DocumentUploader';
+import { IdNumberField } from '@/components/forms/IdNumberField';
 import { Stepper } from '@/components/forms/Stepper';
 import {
   Select,
@@ -16,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
+import { censusFormSchema, isSentinelIdNumber, type CensusFormValues } from '@/lib/schemas/census';
 import { createCensus, getNextFileNumber } from '@/features/census/census.api';
 import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import type { CatalogItem } from '@/features/catalogs/catalogs.api';
@@ -47,6 +48,7 @@ const PAYMENT_STATUS_OPTIONS = [
 const SEX_OPTIONS = [
   { value: 'MASCULINO', label: 'Masculino' },
   { value: 'FEMENINO', label: 'Femenino' },
+  { value: 'NO_APLICA', label: 'No aplica' },
 ];
 
 export function CensusWizard() {
@@ -75,6 +77,7 @@ export function CensusWizard() {
   const watchedOriginTypeId = form.watch('originTypeId');
   const watchedAidTypeId = form.watch('aidTypeId');
   const watchedBeneficiarySame = form.watch('beneficiarySameAsApplicant');
+  const watchedApplicantIdSentinel = isSentinelIdNumber(form.watch('applicantIdNumber') || '');
   const selectedOriginType = originTypes.find((ot) => ot.id === watchedOriginTypeId);
   const selectedAidType = aidTypes.find((at) => at.id === watchedAidTypeId);
 
@@ -175,7 +178,7 @@ export function CensusWizard() {
     { type: undefined, files: additionalFiles },
   ];
 
-  if (idDocType && (documentFiles[idDocType.id]?.length ?? 0) === 0) {
+  if (!isSentinelIdNumber(values.applicantIdNumber) && idDocType && (documentFiles[idDocType.id]?.length ?? 0) === 0) {
     toast.error('La cédula del solicitante es obligatoria.');
     setStep(STEPS.length - 1);
     setSubmitting(false);
@@ -283,8 +286,19 @@ export function CensusWizard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="applicantIdNumber">Cédula *</Label>
-                    <Input id="applicantIdNumber" placeholder="V-27376369" {...form.register('applicantIdNumber')} />
-                    <p className="help-text">Formatos: V-12345678, E-1234567, N-12345678</p>
+                    <Controller
+                      control={form.control}
+                      name="applicantIdNumber"
+                      render={({ field }) => (
+                        <IdNumberField
+                          id="applicantIdNumber"
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                      )}
+                    />
+                    <p className="help-text">Formatos: V-12345678, E-1234567, N-12345678, N/A (no aplica), N/P (no posee)</p>
                     {form.formState.errors.applicantIdNumber && (
                       <p className="error-text">{form.formState.errors.applicantIdNumber.message}</p>
                     )}
@@ -432,7 +446,18 @@ export function CensusWizard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="beneficiaryIdNumber">Cédula del beneficiario *</Label>
-                        <Input id="beneficiaryIdNumber" placeholder="V-27376369" {...form.register('beneficiaryIdNumber')} />
+                        <Controller
+                          control={form.control}
+                          name="beneficiaryIdNumber"
+                          render={({ field }) => (
+                            <IdNumberField
+                              id="beneficiaryIdNumber"
+                              value={field.value ?? ''}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                            />
+                          )}
+                        />
                         {form.formState.errors.beneficiaryIdNumber && (
                           <p className="error-text">{form.formState.errors.beneficiaryIdNumber.message}</p>
                         )}
@@ -626,7 +651,7 @@ export function CensusWizard() {
                     .map((d) => (
                       <DocumentUploader
                         key={d.id}
-                        label={`${d.name}${d.code === 'ID_DOCUMENT' ? ' (Obligatorio)' : ' (Recomendado)'}`}
+                        label={`${d.name}${d.code === 'ID_DOCUMENT' ? (watchedApplicantIdSentinel ? ' (No aplica)' : ' (Obligatorio)') : ' (Recomendado)'}`}
                         multiple
                         value={documentFiles[d.id] ?? []}
                         onChange={(files) => setDocumentFiles((prev) => ({ ...prev, [d.id]: files }))}
@@ -636,8 +661,12 @@ export function CensusWizard() {
                   <div className="rounded-md bg-muted/50 border border-border p-3 text-muted-foreground text-sm flex items-start gap-2">
                     <FileWarning className="h-4 w-4 mt-0.5" />
                     <span>
-                      Solo la <strong>cédula</strong> es obligatoria para guardar. Los demás documentos
-                      pueden adjuntarse después.
+                      {watchedApplicantIdSentinel
+                        ? 'La cédula no aplica para este caso. Los documentos son opcionales.'
+                        : <>
+                            Solo la <strong>cédula</strong> es obligatoria para guardar. Los demás documentos
+                            pueden adjuntarse después.
+                          </>}
                     </span>
                   </div>
                   <DocumentUploader

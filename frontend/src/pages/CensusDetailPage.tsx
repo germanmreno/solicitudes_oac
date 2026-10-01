@@ -29,6 +29,7 @@ import {
 } from '@/features/census/census.api';
 import { listDocumentTypes } from '@/features/documentTypes/documentTypes.api';
 import { formatDate, formatDateTime, formatCurrency, fileSize } from '@/lib/utils';
+import { SEX_LABELS } from '@/lib/labels';
 import { getErrorMessage } from '@/lib/api/client';
 import { useAuthStore } from '@/features/auth/auth.store';
 import { toast } from '@/components/ui/toast';
@@ -192,7 +193,7 @@ export function CensusDetailPage() {
           <CardHeader><CardTitle className="text-lg">Información del solicitante</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <Row label="Cédula" value={c.applicantIdNumber} />
-            <Row label="Sexo" value={c.applicantSex === 'MASCULINO' ? 'Masculino' : 'Femenino'} />
+            <Row label="Sexo" value={SEX_LABELS[c.applicantSex] ?? c.applicantSex} />
             <Row label="Procedencia" value={c.originType?.name || '—'} />
             <Row label="Sede" value={c.site?.name || '—'} />
             <Row label="Procedencia externa" value={c.externalOrigin?.name || '—'} />
@@ -213,7 +214,7 @@ export function CensusDetailPage() {
               <>
                 <Row label="Nombre" value={c.beneficiaryName} />
                 <Row label="Cédula" value={c.beneficiaryIdNumber} />
-                <Row label="Sexo" value={c.beneficiarySex === 'MASCULINO' ? 'Masculino' : c.beneficiarySex === 'FEMENINO' ? 'Femenino' : '—'} />
+                <Row label="Sexo" value={c.beneficiarySex ? SEX_LABELS[c.beneficiarySex] ?? c.beneficiarySex : '—'} />
               </>
             )}
           </CardContent>

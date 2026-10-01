@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { cedulaRegex } from '../auth/auth.schema.js';
+import { idNumberRegex } from '../auth/auth.schema.js';
 
-export const sexSchema = z.enum(['MASCULINO', 'FEMENINO']);
+export const sexSchema = z.enum(['MASCULINO', 'FEMENINO', 'NO_APLICA']);
 
 export const aidStatusSchema = z.enum([
   'ATENDIDO',
@@ -40,7 +40,7 @@ export const censusFormBaseSchema = z.object({
   applicantIdNumber: z
     .string()
     .trim()
-    .regex(cedulaRegex, 'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678'),
+    .regex(idNumberRegex, 'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)'),
   applicantSex: sexSchema,
   applicantType: optionalString,
   personnelType: optionalString,
@@ -112,11 +112,11 @@ function refineCensus(
         path: ['beneficiaryIdNumber'],
         message: 'Debe indicar la cédula del beneficiario',
       });
-    } else if (typeof data.beneficiaryIdNumber === 'string' && !cedulaRegex.test(data.beneficiaryIdNumber)) {
+    } else if (typeof data.beneficiaryIdNumber === 'string' && !idNumberRegex.test(data.beneficiaryIdNumber)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['beneficiaryIdNumber'],
-        message: 'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678',
+        message: 'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)',
       });
     }
     if (!data.beneficiarySex) {

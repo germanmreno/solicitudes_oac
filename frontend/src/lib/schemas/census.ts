@@ -1,21 +1,27 @@
 import { z } from 'zod';
 
 export const cedulaRegex = /^[VENE]-\d{6,8}$/i;
+export const idNumberRegex = /^([VENE]-\d{6,8}|N\/A|N\/P)$/i;
+export const SENTINEL_ID_NUMBERS = ['N/A', 'N/P'] as const;
+export const isSentinelIdNumber = (value: string): boolean =>
+  SENTINEL_ID_NUMBERS.includes(value.trim().toUpperCase() as (typeof SENTINEL_ID_NUMBERS)[number]);
 
 export const cedulaSchema = z
   .string()
   .trim()
   .regex(
-    cedulaRegex,
-    'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678',
+    idNumberRegex,
+    'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)',
   );
+
+export const fileNumberRegex = /^OAC-\d{4}(?:-\d+)?-\d{4}$/i;
 
 export const loginSchema = z.object({
   username: z.string().trim().min(3, 'El usuario debe tener al menos 3 caracteres'),
   password: z.string().min(1, 'La contraseña es obligatoria'),
 });
 
-export const sexSchema = z.enum(['MASCULINO', 'FEMENINO']);
+export const sexSchema = z.enum(['MASCULINO', 'FEMENINO', 'NO_APLICA']);
 
 export const aidStatusSchema = z.enum([
   'ATENDIDO',
@@ -40,7 +46,15 @@ export const optionalDecimal = z
 
 export const censusFormSchema = z
   .object({
-    fileNumber: optionalString,
+    fileNumber: z
+      .string()
+      .trim()
+      .transform((v) => v.replace(/\s+/g, '').toUpperCase())
+      .refine((v) => v === '' || fileNumberRegex.test(v), {
+        message: 'Formato inválido (ej. OAC-0001-2026 o OAC-0309-1-2026)',
+      })
+      .transform((v) => (v === '' ? undefined : v))
+      .optional(),
     applicantName: z.string().trim().min(3, 'El nombre del solicitante es obligatorio'),
     applicantIdNumber: cedulaSchema,
     applicantSex: sexSchema,
@@ -97,11 +111,11 @@ export const censusFormSchema = z
           path: ['beneficiaryIdNumber'],
           message: 'Debe indicar la cédula del beneficiario',
         });
-      } else if (!cedulaRegex.test(data.beneficiaryIdNumber)) {
+      } else if (!idNumberRegex.test(data.beneficiaryIdNumber)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['beneficiaryIdNumber'],
-          message: 'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678',
+          message: 'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)',
         });
       }
       if (!data.beneficiarySex) {

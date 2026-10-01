@@ -25,11 +25,12 @@ importRoutes.post(
   requireRole('ADMIN'),
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    if (!req.file) throw new AppError(400, 'NO_FILE', 'Envíe el archivo CSV en el campo "file"');
-    if (!req.file.mimetype.includes('csv') && !req.file.originalname.toLowerCase().endsWith('.csv')) {
-      throw new AppError(400, 'INVALID_FILE', 'El archivo debe ser un CSV');
+    if (!req.file) throw new AppError(400, 'NO_FILE', 'Envíe el archivo CSV o XLSX en el campo "file"');
+    const name = req.file.originalname.toLowerCase();
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx')) {
+      throw new AppError(400, 'INVALID_FILE', 'El archivo debe ser CSV o XLSX');
     }
-    const result = await importCensusCsv(req.file.buffer, req.user!.sub);
+    const result = await importCensusCsv(req.file.buffer, req.user!.sub, req.file.originalname);
     res.json({ data: result });
   }),
 );

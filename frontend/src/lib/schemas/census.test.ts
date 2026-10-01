@@ -16,6 +16,10 @@ describe('cedulaSchema', () => {
     expect(() => cedulaSchema.parse('V-123')).toThrow();
     expect(() => cedulaSchema.parse('X-12345678')).toThrow();
   });
+  it('acepta centinelas No Aplica y No Posee', () => {
+    expect(() => cedulaSchema.parse('N/A')).not.toThrow();
+    expect(() => cedulaSchema.parse('n/p')).not.toThrow();
+  });
 });
 
 describe('censusFormSchema', () => {
@@ -30,6 +34,48 @@ describe('censusFormSchema', () => {
       aidDescription: 'Detalle',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('acepta sexo y cédula No Aplica (casos de proyectos)', () => {
+    const result = censusFormSchema.safeParse({
+      applicantName: 'SENOSALUD',
+      applicantIdNumber: 'N/A',
+      applicantSex: 'NO_APLICA',
+      originTypeId: 'some-uuid',
+      aidTypeId: 'some-uuid',
+      aidAreaId: 'some-uuid',
+      aidDescription: 'Proyecto',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('acepta expediente con sufijo extra y lo normaliza', () => {
+    const result = censusFormSchema.safeParse({
+      applicantName: 'Proyecto',
+      applicantIdNumber: 'N/A',
+      applicantSex: 'NO_APLICA',
+      originTypeId: 'some-uuid',
+      aidTypeId: 'some-uuid',
+      aidAreaId: 'some-uuid',
+      aidDescription: 'Proyecto',
+      fileNumber: 'OAC- 0309-1- 2026',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.fileNumber).toBe('OAC-0309-1-2026');
+  });
+
+  it('rechaza expediente con formato inválido', () => {
+    const result = censusFormSchema.safeParse({
+      applicantName: 'Proyecto',
+      applicantIdNumber: 'N/A',
+      applicantSex: 'NO_APLICA',
+      originTypeId: 'some-uuid',
+      aidTypeId: 'some-uuid',
+      aidAreaId: 'some-uuid',
+      aidDescription: 'Proyecto',
+      fileNumber: 'OAC-309-2026',
+    });
+    expect(result.success).toBe(false);
   });
 
   it('requiere datos del beneficiario si no es el mismo solicitante', () => {

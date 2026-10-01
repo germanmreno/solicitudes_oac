@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { IdNumberField } from '@/components/forms/IdNumberField';
 import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
 import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import { updateCensus, type CensusDetail } from '@/features/census/census.api';
@@ -23,6 +24,7 @@ import { toast } from '@/components/ui/toast';
 const SEX_OPTIONS = [
   { value: 'MASCULINO', label: 'Masculino' },
   { value: 'FEMENINO', label: 'Femenino' },
+  { value: 'NO_APLICA', label: 'No aplica' },
 ];
 
 export function EditCensusDialog({
@@ -96,7 +98,17 @@ export function EditCensusDialog({
                 <Input {...form.register('applicantName')} />
               </Field>
               <Field label="Cédula *" error={form.formState.errors.applicantIdNumber?.message}>
-                <Input {...form.register('applicantIdNumber')} />
+                <Controller
+                  control={form.control}
+                  name="applicantIdNumber"
+                  render={({ field }) => (
+                    <IdNumberField
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </Field>
               <Field label="Sexo *">
                 <Controller
@@ -199,7 +211,17 @@ export function EditCensusDialog({
                     <Input {...form.register('beneficiaryName')} />
                   </Field>
                   <Field label="Cédula del beneficiario *" error={form.formState.errors.beneficiaryIdNumber?.message}>
-                    <Input {...form.register('beneficiaryIdNumber')} />
+                    <Controller
+                      control={form.control}
+                      name="beneficiaryIdNumber"
+                      render={({ field }) => (
+                        <IdNumberField
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                      )}
+                    />
                   </Field>
                   <Field label="Sexo del beneficiario *">
                     <Controller

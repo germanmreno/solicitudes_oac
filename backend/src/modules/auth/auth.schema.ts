@@ -2,12 +2,17 @@ import { z } from 'zod';
 
 export const cedulaRegex = /^[VENE]-\d{6,8}$/i;
 
+export const SENTINEL_ID_NUMBERS = ['N/A', 'N/P'] as const;
+export const idNumberRegex = /^([VENE]-\d{6,8}|N\/A|N\/P)$/i;
+export const isSentinelIdNumber = (value: string): boolean =>
+  SENTINEL_ID_NUMBERS.includes(value.trim().toUpperCase() as (typeof SENTINEL_ID_NUMBERS)[number]);
+
 export const cedulaSchema = z
   .string()
   .trim()
   .regex(
-    cedulaRegex,
-    'Formato inválido. Ejemplos: V-27376369, E-1234567, N-12345678',
+    idNumberRegex,
+    'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)',
   );
 
 export const loginSchema = z.object({

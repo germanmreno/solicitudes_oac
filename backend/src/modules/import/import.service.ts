@@ -1,7 +1,8 @@
 import { parse } from 'csv-parse';
+import * as XLSX from 'xlsx';
 import { prisma } from '../../lib/prisma.js';
-import { cedulaRegex } from '../auth/auth.schema.js';
-import { reserveFileNumber } from '../census/census.service.js';
+import { idNumberRegex } from '../auth/auth.schema.js';
+import { FILE_NUMBER_REGEX, reserveFileNumber } from '../census/census.service.js';
 import { writeAudit } from '../audit/audit.service.js';
 
 const norm = (s: string | undefined) =>
@@ -77,7 +78,9 @@ function clean(value: string | undefined): string | undefined {
   return s;
 }
 
-const SEX_MAP: Record<string, 'MASCULINO' | 'FEMENINO'> = {
+type Sex = 'MASCULINO' | 'FEMENINO' | 'NO_APLICA';
+
+const SEX_MAP: Record<string, Sex> = {
   M: 'MASCULINO',
   MASCULINO: 'MASCULINO',
   F: 'FEMENINO',
@@ -107,9 +110,11 @@ const NO_PROCEDE_YES = new Set(['S', 'SI', 'X', '1', 'TRUE']);
 type AidStatus = 'ATENDIDO' | 'EN_PROCESO' | 'EN_EVALUACION' | 'NO_PROCEDE';
 type PaymentStatus = 'PENDIENTE' | 'PAGADO' | 'ANULADO';
 
-function parseSex(value: string | undefined): 'MASCULINO' | 'FEMENINO' | undefined {
+export function parseSex(value: string | undefined): Sex | undefined {
   const s = norm(value);
-  if (!s || NA_VALUES.has(s)) return undefined;
+  if (!s) return undefined;
+  if (s === 'NA' || s === 'NOAPLICA') return 'NO_APLICA';
+  if (NA_VALUES.has(s)) return undefined;
   const mapped = SEX_MAP[s];
   if (!mapped) throw new Error(`Sexo no válido: "${value}"`);
   return mapped;
@@ -153,22 +158,36 @@ function parseDate(value: string | undefined): Date | undefined {
   return undefined;
 }
 
-function parseDecimal(value: string | undefined): string | undefined {
+export function parseDecimal(value: string | undefined): string | undefined {
   const m = (value || '').toString().trim().match(/\d[\d.,]*/);
   if (!m) return undefined;
   let t = m[0];
-  if (t.includes(',') && t.includes('.')) t = t.replace(/\./g, '').replace(',', '.');
-  else if (t.includes(',')) t = t.replace(',', '.');
-  else if (/\.\d{3}$/.test(t)) t = t.replace(/\./g, '');
+  const lastComma = t.lastIndexOf(',');
+  const lastDot = t.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  if (lastSep !== -1) {
+    const sep = t.charAt(lastSep);
+    const decimals = t.length - lastSep - 1;
+    const isSingleGrouping = decimals === 3 && t.indexOf(sep) === lastSep;
+    if (isSingleGrouping) {
+      t = t.replace(/[.,]/g, '');
+    } else {
+      const intPart = t.slice(0, lastSep).replace(/[.,]/g, '');
+      const fracPart = t.slice(lastSep + 1).replace(/[.,]/g, '');
+      t = `${intPart}.${fracPart}`;
+    }
+  }
   const n = Number(t);
   if (Number.isNaN(n)) throw new Error(`Monto/tasa no válido: "${value}"`);
   return String(n);
 }
 
-function normalizeCedula(value: string | undefined): string {
-  let s = (value || '').trim().toUpperCase();
-  if (!s) return s;
-  s = s.replace(/^C\.?\s*I\.?\s*/i, '');
+export function normalizeCedula(value: string | undefined): string {
+  const raw = (value || '').trim().toUpperCase();
+  if (!raw) return raw;
+  if (/^N\/?A$/.test(raw) || raw === 'NO APLICA' || raw === 'NO APLICA.') return 'N/A';
+  if (/^N\/?P$/.test(raw) || raw === 'NO POSEE' || raw === 'NO POSEE.') return 'N/P';
+  let s = raw.replace(/^C\.?\s*I\.?\s*/i, '');
   s = s.replace(/[\s.]/g, '');
   if (!/^[VENE]-\d+$/.test(s)) s = `V-${s}`;
   return s;
@@ -196,9 +215,31 @@ export interface ImportResult {
   errors: ImportError[];
 }
 
-export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<ImportResult> {
+function isXlsx(buffer: Buffer, originalName?: string): boolean {
+  if (/\.xlsx$/i.test(originalName ?? '')) return true;
+  return buffer.length > 1 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+}
+
+async function bufferToRows(buffer: Buffer, originalName?: string): Promise<string[][]> {
+  if (isXlsx(buffer, originalName)) {
+    const wb = XLSX.read(buffer, { type: 'buffer' });
+    let best: { rows: string[][]; hits: number } | null = null;
+    for (const name of wb.SheetNames) {
+      const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name]!, {
+        header: 1,
+        raw: false,
+        defval: '',
+      });
+      const hits = rows.reduce(
+        (acc, row) => Math.max(acc, row.filter((c) => HEADER_MAP[norm(String(c))]).length),
+        0,
+      );
+      if (!best || hits > best.hits) best = { rows, hits };
+    }
+    return best?.rows ?? [];
+  }
   const delimiter = detectDelimiter(buffer);
-  const rows = await new Promise<string[][]>((resolve, reject) => {
+  return new Promise<string[][]>((resolve, reject) => {
     parse(buffer, {
       bom: true,
       trim: true,
@@ -208,6 +249,14 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
       relax_quotes: true,
     }, (err, out) => (err ? reject(err) : resolve(out as string[][])));
   });
+}
+
+export async function importCensusCsv(
+  buffer: Buffer,
+  actorId: string,
+  originalName?: string,
+): Promise<ImportResult> {
+  const rows = await bufferToRows(buffer, originalName);
 
   let headerRow: string[] = rows[0] ?? [];
   let header: string[] = [];
@@ -255,6 +304,7 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
       header.forEach((key, i) => {
         if (key && row[i] !== undefined && (row[i] || '').trim() !== '') fields[key] = row[i].trim();
       });
+      if (!fields.applicantName && !fields.applicantIdNumber && !fields.fileNumber) continue;
 
       caseInfo = {
         fileNumber: (fields.fileNumber || '').trim() || null,
@@ -267,7 +317,7 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
       const applicantSex = parseSex(fields.applicantSex);
 
       if (!applicantName || applicantName.length < 3) throw new Error('Falta el nombre del solicitante');
-      if (!applicantIdNumber || !cedulaRegex.test(applicantIdNumber)) {
+      if (!applicantIdNumber || !idNumberRegex.test(applicantIdNumber)) {
         throw new Error(`Cédula inválida: "${fields.applicantIdNumber}"`);
       }
       if (!applicantSex) throw new Error('Falta el sexo del solicitante');
@@ -278,19 +328,20 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
       const procedencia = clean(fields.originType);
       let siteId: string | null = null;
       let externalOriginId: string | null = null;
-      let originTypeId = origin.id;
+      const originTypeId = origin.id;
       if (origin.requiresSite) {
-        if (!procedencia) throw new Error('Falta la sede para la procedencia interna');
-        const siteKey = norm(procedencia);
-        siteId = siteByName.get(siteKey) ?? null;
-        if (!siteId) {
-          const created = await prisma.site.create({
-            data: { name: procedencia, active: true },
-            select: { id: true },
-          });
-          siteId = created.id;
-          siteByName.set(siteKey, siteId);
-          createdSites++;
+        if (procedencia) {
+          const siteKey = norm(procedencia);
+          siteId = siteByName.get(siteKey) ?? null;
+          if (!siteId) {
+            const created = await prisma.site.create({
+              data: { name: procedencia, active: true },
+              select: { id: true },
+            });
+            siteId = created.id;
+            siteByName.set(siteKey, siteId);
+            createdSites++;
+          }
         }
       } else if (procedencia) {
         const extKey = norm(procedencia);
@@ -334,10 +385,10 @@ export async function importCensusCsv(buffer: Buffer, actorId: string): Promise<
         : parseProcessStatus(fields.noProcede) ?? parseProcessStatus(fields.aidStatus) ?? 'EN_PROCESO';
       const paymentStatus = parsePaymentStatus(fields.aidStatus) ?? parsePaymentStatus(fields.noProcede);
 
-      let fileNumber = (fields.fileNumber || '').trim();
+      let fileNumber = (fields.fileNumber || '').replace(/\s+/g, '').toUpperCase();
       if (!fileNumber) {
         fileNumber = await reserveFileNumber();
-      } else if (!/^OAC-\d{4}-\d{4}$/i.test(fileNumber)) {
+      } else if (!FILE_NUMBER_REGEX.test(fileNumber)) {
         throw new Error(`Número de expediente inválido: "${fields.fileNumber}"`);
       }
 

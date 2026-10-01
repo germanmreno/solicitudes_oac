@@ -2,15 +2,13 @@ import type { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
 import { verifyAccessToken } from '../lib/jwt.js';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        sub: string;
-        username: string;
-        role: 'ADMIN' | 'OPERATOR';
-      };
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: {
+      sub: string;
+      username: string;
+      role: 'ADMIN' | 'OPERATOR';
+    };
   }
 }
 

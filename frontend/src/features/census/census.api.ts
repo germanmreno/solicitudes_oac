@@ -1,13 +1,15 @@
 import { api } from '@/lib/api/client';
 import { API_BASE } from '@/lib/api/config';
 
+export type Sex = 'MASCULINO' | 'FEMENINO' | 'NO_APLICA';
+
 export interface CensusListItem {
   id: string;
   fileNumber: string | null;
   registrationDate: string;
   applicantName: string;
   applicantIdNumber: string;
-  applicantSex: 'MASCULINO' | 'FEMENINO';
+  applicantSex: Sex;
   applicantType: string | null;
   personnelType: string | null;
   originType: { id: string; name: string; requiresSite: boolean };
@@ -17,7 +19,7 @@ export interface CensusListItem {
   beneficiarySameAsApplicant: boolean;
   beneficiaryName: string | null;
   beneficiaryIdNumber: string | null;
-  beneficiarySex: 'MASCULINO' | 'FEMENINO' | null;
+  beneficiarySex: Sex | null;
   aidType: { id: string; name: string };
   aidArea: { id: string; name: string; requiresDetail: boolean };
   aidAreaOther: string | null;

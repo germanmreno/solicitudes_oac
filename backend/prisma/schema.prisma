@@ -33,6 +33,7 @@ enum DocumentKind {
 enum Sex {
   MASCULINO
   FEMENINO
+  NO_APLICA
 }
 
 model OriginType {

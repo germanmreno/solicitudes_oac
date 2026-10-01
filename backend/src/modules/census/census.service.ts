@@ -4,13 +4,14 @@ import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middlewares/error.js';
 import { writeAudit } from '../audit/audit.service.js';
+import { isSentinelIdNumber } from '../auth/auth.schema.js';
 import type { CreateCensusInput, ListCensusQuery, UpdateCensusInput } from './census.schema.js';
 
 function toPublicPath(absolutePath: string): string {
   return path.relative(path.resolve(env.UPLOAD_DIR), absolutePath).split(path.sep).join('/');
 }
 
-const FILE_NUMBER_REGEX = /^OAC-\d{4}-\d{4}$/;
+export const FILE_NUMBER_REGEX = /^OAC-\d{4}(?:-\d+)?-\d{4}$/i;
 
 async function findDocumentTypeByCode(code: string) {
   return prisma.documentType.findUnique({ where: { code, active: true } });
@@ -35,21 +36,25 @@ export function diffFields<T extends Record<string, unknown>>(
 
 export async function generateFileNumber(year?: number): Promise<string> {
   const y = year ?? new Date().getFullYear();
-  const count = await prisma.census.count({
-    where: {
-      fileNumber: {
-        startsWith: 'OAC-',
-        endsWith: `-${y}`,
-      },
-    },
+  const rows = await prisma.census.findMany({
+    where: { fileNumber: { startsWith: 'OAC-', endsWith: `-${y}` } },
+    select: { fileNumber: true },
   });
-  return `OAC-${String(count + 1).padStart(4, '0')}-${y}`;
+  const seqRegex = new RegExp(`^OAC-(\\d{4})(?:-\\d+)?-${y}$`, 'i');
+  let max = 0;
+  for (const { fileNumber } of rows) {
+    const m = fileNumber?.match(seqRegex);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `OAC-${String(max + 1).padStart(4, '0')}-${y}`;
 }
 
 export async function reserveFileNumber(year?: number, maxAttempts = 10): Promise<string> {
   const y = year ?? new Date().getFullYear();
+  const base = await generateFileNumber(y);
+  const baseSeq = Number(base.match(/^OAC-(\d+)-/)?.[1] ?? 0);
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const candidate = await generateFileNumber(y);
+    const candidate = `OAC-${String(baseSeq + attempt).padStart(4, '0')}-${y}`;
     const collision = await prisma.census.findUnique({
       where: { fileNumber: candidate },
       select: { id: true },
@@ -201,7 +206,7 @@ export async function createCensus(
     throw new AppError(400, 'AID_AREA_DETAIL_REQUIRED', 'Debe especificar el detalle del área de ayuda');
   }
 
-  let fileNumber = input.fileNumber || null;
+  let fileNumber = (input.fileNumber || '').replace(/\s+/g, '').toUpperCase() || null;
   if (fileNumber && !FILE_NUMBER_REGEX.test(fileNumber)) {
     throw new AppError(400, 'INVALID_FILE_NUMBER', 'Formato de N° de expediente inválido');
   }
@@ -209,7 +214,7 @@ export async function createCensus(
     fileNumber = await reserveFileNumber();
   }
 
-  if (!publicPaths.idDocument) {
+  if (!publicPaths.idDocument && !isSentinelIdNumber(input.applicantIdNumber)) {
     throw new AppError(
       400,
       'MISSING_REQUIRED_DOCUMENT',
@@ -377,10 +382,11 @@ export async function updateCensus(
   if (input.invoiceNote !== undefined) data.invoiceNote = input.invoiceNote;
   if (input.responsibleName !== undefined) data.responsibleName = input.responsibleName;
   if (input.fileNumber !== undefined) {
-    if (input.fileNumber && !FILE_NUMBER_REGEX.test(input.fileNumber)) {
+    const fileNumber = (input.fileNumber || '').replace(/\s+/g, '').toUpperCase() || null;
+    if (fileNumber && !FILE_NUMBER_REGEX.test(fileNumber)) {
       throw new AppError(400, 'INVALID_FILE_NUMBER', 'Formato de N° de expediente inválido');
     }
-    data.fileNumber = input.fileNumber;
+    data.fileNumber = fileNumber;
   }
 
   const updated = await prisma.census.update({
