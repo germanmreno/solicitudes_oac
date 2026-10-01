@@ -138,7 +138,10 @@ export const updateCensusSchema = censusFormBaseSchema
 export const listCensusQuerySchema = z.object({
   q: z.string().optional(),
   status: aidStatusSchema.optional(),
+  aidTypeId: z.string().optional(),
   aidAreaId: z.string().optional(),
+  originTypeId: z.string().optional(),
+  paymentStatus: paymentStatusSchema.optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   createdById: z.string().optional(),

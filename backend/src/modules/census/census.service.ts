@@ -91,11 +91,14 @@ const censusIncludeDetail = {
 };
 
 export async function listCensus(query: ListCensusQuery) {
-  const { q, status, aidAreaId, from, to, createdById, page, limit } = query;
+  const { q, status, aidTypeId, aidAreaId, originTypeId, paymentStatus, from, to, createdById, page, limit } = query;
   const where: Prisma.CensusWhereInput = {};
 
   if (status) where.aidStatus = status as AidStatus;
+  if (aidTypeId) where.aidTypeId = aidTypeId;
   if (aidAreaId) where.aidAreaId = aidAreaId;
+  if (originTypeId) where.originTypeId = originTypeId;
+  if (paymentStatus) where.paymentStatus = paymentStatus as PaymentStatus;
   if (createdById) where.createdById = createdById;
 
   if (from || to) {

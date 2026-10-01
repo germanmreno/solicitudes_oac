@@ -69,7 +69,10 @@ export interface CensusDetail extends CensusListItem {
 export interface ListCensusParams {
   q?: string;
   status?: string;
+  aidTypeId?: string;
   aidAreaId?: string;
+  originTypeId?: string;
+  paymentStatus?: string;
   from?: string;
   to?: string;
   createdById?: string;

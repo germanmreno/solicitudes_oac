@@ -16,16 +16,36 @@ import {
 } from '@/components/ui/select';
 import { DataTable, type DataTableColumn, type DataTableSort } from '@/components/ui/DataTable';
 import { listCensus, type CensusListItem } from '@/features/census/census.api';
+import { listAidTypes, listAidAreas, listOriginTypes } from '@/features/catalogs/catalogs.api';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/features/auth/auth.store';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+
+const STATUS_OPTIONS = [
+  { value: 'EN_EVALUACION', label: 'En evaluación' },
+  { value: 'EN_PROCESO', label: 'En proceso' },
+  { value: 'ATENDIDO', label: 'Atendido' },
+  { value: 'NO_PROCEDE', label: 'No procede' },
+];
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: 'PENDIENTE', label: 'Pendiente' },
+  { value: 'PAGADO', label: 'Pagado' },
+  { value: 'ANULADO', label: 'Anulado' },
+];
 
 export function CensusListPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [aidTypeId, setAidTypeId] = useState('');
+  const [aidAreaId, setAidAreaId] = useState('');
+  const [originTypeId, setOriginTypeId] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [sort, setSort] = useState<DataTableSort>({ columnId: 'registrationDate', direction: 'desc' });
@@ -33,6 +53,12 @@ export function CensusListPage() {
   const params = {
     q: q || undefined,
     status: status || undefined,
+    aidTypeId: aidTypeId || undefined,
+    aidAreaId: aidAreaId || undefined,
+    originTypeId: originTypeId || undefined,
+    paymentStatus: paymentStatus || undefined,
+    from: from || undefined,
+    to: to || undefined,
     page,
     limit: pageSize,
   };
@@ -41,6 +67,40 @@ export function CensusListPage() {
     queryKey: ['census', params],
     queryFn: () => listCensus(params),
   });
+
+  const { data: aidTypes = [] } = useQuery({
+    queryKey: ['aid-types'],
+    queryFn: listAidTypes,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const { data: aidAreas = [] } = useQuery({
+    queryKey: ['aid-areas', aidTypeId],
+    queryFn: () => listAidAreas(aidTypeId || undefined),
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const { data: originTypes = [] } = useQuery({
+    queryKey: ['origin-types'],
+    queryFn: listOriginTypes,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const hasFilters = Boolean(
+    q || status || aidTypeId || aidAreaId || originTypeId || paymentStatus || from || to,
+  );
+
+  function clearFilters() {
+    setQ('');
+    setStatus('');
+    setAidTypeId('');
+    setAidAreaId('');
+    setOriginTypeId('');
+    setPaymentStatus('');
+    setFrom('');
+    setTo('');
+    setPage(1);
+  }
 
   const total = data?.meta.total ?? 0;
   const totalPages = data?.meta.totalPages ?? 1;
@@ -145,33 +205,135 @@ export function CensusListPage() {
       </header>
 
       <Card>
-        <div role="search" aria-label="Filtros de búsqueda" className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          <div className="relative sm:col-span-2">
+        <div role="search" aria-label="Filtros de búsqueda" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          <div className="relative sm:col-span-2 lg:col-span-3">
             <label htmlFor="q-search" className="sr-only">Buscar</label>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
             <Input
               id="q-search"
-              placeholder="Buscar por nombre, cédula o N° de expediente"
+              placeholder="Buscar por nombre, cédula, N° de expediente o descripción"
               className="pl-10"
               value={q}
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
               aria-label="Buscar solicitudes"
             />
           </div>
+
           <div>
-            <label htmlFor="status-filter" className="sr-only">Filtrar por estatus</label>
+            <label htmlFor="status-filter" className="sr-only">Estatus</label>
             <Select value={status || 'all'} onValueChange={(v) => { setStatus(v === 'all' ? '' : v); setPage(1); }}>
-              <SelectTrigger id="status-filter">
-                <SelectValue placeholder="Todos los estatus" />
+              <SelectTrigger id="status-filter" aria-label="Filtrar por estatus">
+                <SelectValue placeholder="Estatus" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estatus</SelectItem>
-                <SelectItem value="EN_EVALUACION">En evaluación</SelectItem>
-                <SelectItem value="EN_PROCESO">En proceso</SelectItem>
-                <SelectItem value="ATENDIDO">Atendido</SelectItem>
-                <SelectItem value="NO_PROCEDE">No procede</SelectItem>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <label htmlFor="aid-type-filter" className="sr-only">Tipo de ayuda</label>
+            <Select
+              value={aidTypeId || 'all'}
+              onValueChange={(v) => { setAidTypeId(v === 'all' ? '' : v); setAidAreaId(''); setPage(1); }}
+            >
+              <SelectTrigger id="aid-type-filter" aria-label="Filtrar por tipo de ayuda">
+                <SelectValue placeholder="Tipo de ayuda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                {aidTypes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="aid-area-filter" className="sr-only">Área de ayuda</label>
+            <Select
+              value={aidAreaId || 'all'}
+              onValueChange={(v) => { setAidAreaId(v === 'all' ? '' : v); setPage(1); }}
+            >
+              <SelectTrigger id="aid-area-filter" aria-label="Filtrar por área de ayuda">
+                <SelectValue placeholder="Área de ayuda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las áreas</SelectItem>
+                {aidAreas.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="origin-type-filter" className="sr-only">Procedencia</label>
+            <Select
+              value={originTypeId || 'all'}
+              onValueChange={(v) => { setOriginTypeId(v === 'all' ? '' : v); setPage(1); }}
+            >
+              <SelectTrigger id="origin-type-filter" aria-label="Filtrar por tipo de procedencia">
+                <SelectValue placeholder="Procedencia" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las procedencias</SelectItem>
+                {originTypes.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="payment-status-filter" className="sr-only">Estatus de pago</label>
+            <Select
+              value={paymentStatus || 'all'}
+              onValueChange={(v) => { setPaymentStatus(v === 'all' ? '' : v); setPage(1); }}
+            >
+              <SelectTrigger id="payment-status-filter" aria-label="Filtrar por estatus de pago">
+                <SelectValue placeholder="Estatus de pago" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los pagos</SelectItem>
+                {PAYMENT_STATUS_OPTIONS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="from-filter" className="block text-xs text-muted-foreground mb-1">Desde</label>
+            <Input
+              id="from-filter"
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => { setFrom(e.target.value); setPage(1); }}
+              aria-label="Fecha de registro desde"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="to-filter" className="block text-xs text-muted-foreground mb-1">Hasta</label>
+            <Input
+              id="to-filter"
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => { setTo(e.target.value); setPage(1); }}
+              aria-label="Fecha de registro hasta"
+            />
+          </div>
+
+          <div className="flex items-end">
+            <Button variant="outline" onClick={clearFilters} disabled={!hasFilters} className="w-full">
+              Limpiar filtros
+            </Button>
           </div>
         </div>
 
@@ -187,7 +349,7 @@ export function CensusListPage() {
         ) : items.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground space-y-3">
             <FileText className="h-10 w-10 mx-auto opacity-50" aria-hidden />
-            <p>{q || status ? 'No se encontraron solicitudes con los filtros aplicados.' : 'No hay solicitudes registradas.'}</p>
+            <p>{hasFilters ? 'No se encontraron solicitudes con los filtros aplicados.' : 'No hay solicitudes registradas.'}</p>
             <Button asChild>
               <Link to="/census/new">Crear la primera</Link>
             </Button>
