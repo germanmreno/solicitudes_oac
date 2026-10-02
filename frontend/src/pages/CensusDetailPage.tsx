@@ -151,7 +151,7 @@ export function CensusDetailPage() {
     );
   }
 
-  const missingRequired = documentTypes
+  const recommendedMissing = documentTypes
     .filter((d) => d.requiredForAidType)
     .filter((d) => (c?.documents.filter((doc) => doc.documentTypeId === d.id).length ?? 0) === 0);
 
@@ -172,7 +172,7 @@ export function CensusDetailPage() {
 
       <div className="flex flex-wrap items-start gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-sans text-secondary font-semibold">{c.applicantName}</h1>
+          <h1 className="text-2xl font-serif text-secondary font-semibold">{c.applicantName}</h1>
           <p className="text-sm text-muted-foreground font-mono">{c.applicantIdNumber}</p>
         </div>
         <div className="ml-auto flex flex-col items-end gap-2">
@@ -274,7 +274,7 @@ export function CensusDetailPage() {
               <FileText className="h-5 w-5 text-primary" /> Documentos
             </CardTitle>
             <CardDescription>
-              Adjunte los documentos de la solicitud. Seleccione el tipo antes de subir.
+              Adjunte los documentos de la solicitud. Seleccione el tipo antes de subir. Todos son opcionales.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -286,7 +286,7 @@ export function CensusDetailPage() {
                   <SelectContent>
                     {documentTypes.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
-                        {d.name}{d.requiredForAidType ? ' *' : ''}
+                        {d.name}{d.requiredForAidType ? ' (recomendado)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -372,10 +372,10 @@ export function CensusDetailPage() {
                         <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{fileSize(doc.size)}</td>
                         <td className="py-1.5 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => handleDownloadDoc(doc.id, doc.fileName)} disabled={downloading === doc.id} title="Descargar">
+                            <Button size="sm" variant="ghost" aria-label={`Descargar ${doc.fileName}`} onClick={() => handleDownloadDoc(doc.id, doc.fileName)} disabled={downloading === doc.id} title="Descargar">
                               {downloading === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                             </Button>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" title="Eliminar" onClick={() => {
+                            <Button size="sm" variant="ghost" aria-label={`Eliminar ${doc.fileName}`} className="text-destructive hover:bg-destructive/10" title="Eliminar" onClick={() => {
                               if (confirm(`¿Eliminar el documento "${doc.fileName}"?`)) deleteMutation.mutate(doc.id);
                             }}>
                               <Trash2 className="h-4 w-4" />
@@ -391,11 +391,11 @@ export function CensusDetailPage() {
               <p className="text-muted-foreground text-xs">Aún no se han adjuntado documentos.</p>
             )}
 
-            {missingRequired.length > 0 && (
-              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
+            {recommendedMissing.length > 0 && (
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-muted-foreground text-sm flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
-                  Faltan documentos obligatorios: {missingRequired.map((d) => d.name).join(', ')}.
+                  Documentos recomendados pendientes: {recommendedMissing.map((d) => d.name).join(', ')}.
                 </span>
               </div>
             )}
@@ -468,6 +468,7 @@ function InitialFileRow({
       <Button
         size="sm"
         variant="outline"
+        aria-label={`Descargar ${label}`}
         onClick={onDownload}
         disabled={downloading}
         title="Descargar"

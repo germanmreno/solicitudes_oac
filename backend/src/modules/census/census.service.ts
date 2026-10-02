@@ -4,7 +4,6 @@ import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middlewares/error.js';
 import { writeAudit } from '../audit/audit.service.js';
-import { isSentinelIdNumber } from '../auth/auth.schema.js';
 import type { CreateCensusInput, ListCensusQuery, UpdateCensusInput } from './census.schema.js';
 
 function toPublicPath(absolutePath: string): string {
@@ -215,14 +214,6 @@ export async function createCensus(
   }
   if (!fileNumber) {
     fileNumber = await reserveFileNumber();
-  }
-
-  if (!publicPaths.idDocument && !isSentinelIdNumber(input.applicantIdNumber)) {
-    throw new AppError(
-      400,
-      'MISSING_REQUIRED_DOCUMENT',
-      'La cédula del solicitante es obligatoria',
-    );
   }
 
   const idDocType = await findDocumentTypeByCode('ID_DOCUMENT');

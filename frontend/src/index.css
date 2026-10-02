@@ -16,10 +16,14 @@
     line-height: 1.5;
   }
   h1, h2, h3, h4 {
-    @apply font-sans text-secondary;
-  }
-  h1, h2, h3, h4 {
     @apply font-serif text-secondary;
+  }
+  ::selection {
+    background: theme('colors.accent.DEFAULT');
+    color: theme('colors.secondary.DEFAULT');
+  }
+  * {
+    scrollbar-color: theme('colors.border') transparent;
   }
   *:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;

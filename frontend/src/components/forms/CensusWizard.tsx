@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { censusFormSchema, isSentinelIdNumber, type CensusFormValues } from '@/lib/schemas/census';
+import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
 import { createCensus, getNextFileNumber } from '@/features/census/census.api';
 import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import type { CatalogItem } from '@/features/catalogs/catalogs.api';
@@ -77,7 +77,6 @@ export function CensusWizard() {
   const watchedOriginTypeId = form.watch('originTypeId');
   const watchedAidTypeId = form.watch('aidTypeId');
   const watchedBeneficiarySame = form.watch('beneficiarySameAsApplicant');
-  const watchedApplicantIdSentinel = isSentinelIdNumber(form.watch('applicantIdNumber') || '');
   const selectedOriginType = originTypes.find((ot) => ot.id === watchedOriginTypeId);
   const selectedAidType = aidTypes.find((at) => at.id === watchedAidTypeId);
 
@@ -165,78 +164,59 @@ export function CensusWizard() {
   }
 
   async function onSubmit(values: CensusFormValues) {
-  const idDocType = documentTypes.find((d) => d.code === 'ID_DOCUMENT');
-  const invoiceDocType = documentTypes.find((d) => d.code === 'INVOICE');
-  const requiredOtherDocTypes = documentTypes.filter(
-    (d) => d.requiredForAidType && d.code !== 'ID_DOCUMENT' && d.code !== 'INVOICE',
-  );
-
-  const allFilesByType: { type: DocumentTypeItem | undefined; files: UploadedFileMeta[] }[] = [
-    { type: idDocType, files: idDocType ? documentFiles[idDocType.id] ?? [] : [] },
-    { type: invoiceDocType, files: invoiceDocType ? documentFiles[invoiceDocType.id] ?? [] : [] },
-    ...requiredOtherDocTypes.map((t) => ({ type: t, files: documentFiles[t.id] ?? [] })),
-    { type: undefined, files: additionalFiles },
-  ];
-
-  if (!isSentinelIdNumber(values.applicantIdNumber) && idDocType && (documentFiles[idDocType.id]?.length ?? 0) === 0) {
-    toast.error('La cédula del solicitante es obligatoria.');
-    setStep(STEPS.length - 1);
-    setSubmitting(false);
-    return;
-  }
-
-  setSubmitting(true);
-  try {
-    const formData = new FormData();
-    Object.entries(values).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        formData.append(k, String(v));
-      }
-    });
-
-    const allUploads: { field: string; files: UploadedFileMeta[] }[] = [];
-    if (idDocType && documentFiles[idDocType.id]?.[0]) {
-      allUploads.push({ field: 'idDocument', files: [documentFiles[idDocType.id][0]] });
-    }
-    if (invoiceDocType && documentFiles[invoiceDocType.id]?.[0]) {
-      allUploads.push({ field: 'invoice', files: [documentFiles[invoiceDocType.id][0]] });
-    }
-    const medical: UploadedFileMeta[] = [];
-    for (const { type, files } of allFilesByType) {
-      if (!type || type.code === 'ID_DOCUMENT' || type.code === 'INVOICE') continue;
-      for (const f of files) medical.push(f);
-    }
-    if (additionalFiles.length > 0) {
-      for (const f of additionalFiles) medical.push(f);
-    }
-    if (medical.length > 0) allUploads.push({ field: 'medical', files: medical });
-
-    for (const { field, files } of allUploads) {
-      for (const f of files) formData.append(field, f.file);
-    }
-
-    if (!navigator.onLine) {
-      await db.drafts.put({
-        id: crypto.randomUUID(),
-        data: values as unknown as Record<string, unknown>,
-        step: STEPS.length - 1,
-        updatedAt: Date.now(),
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      Object.entries(values).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          formData.append(k, String(v));
+        }
       });
-      await enqueueMutation({ method: 'POST', url: '/census', body: formData });
-      toast.info('Solicitud guardada localmente. Se enviará al recuperar la conexión.');
-      navigate('/census/list');
-      return;
-    }
 
-    const created = await createCensus(formData);
-    toast.success(`Solicitud ${created.fileNumber || created.id} creada correctamente.`);
-    navigate(`/census/${created.id}`);
-  } catch (err) {
-    toast.error(getErrorMessage(err, 'No se pudo crear la solicitud'));
-  } finally {
-    setSubmitting(false);
+      const idDocType = documentTypes.find((d) => d.code === 'ID_DOCUMENT');
+      const invoiceDocType = documentTypes.find((d) => d.code === 'INVOICE');
+      const medical: UploadedFileMeta[] = [
+        ...documentTypes
+          .filter((d) => d.code !== 'ID_DOCUMENT' && d.code !== 'INVOICE')
+          .flatMap((d) => documentFiles[d.id] ?? []),
+        ...additionalFiles,
+      ];
+
+      const allUploads: { field: string; files: UploadedFileMeta[] }[] = [];
+      if (idDocType && documentFiles[idDocType.id]?.[0]) {
+        allUploads.push({ field: 'idDocument', files: [documentFiles[idDocType.id][0]] });
+      }
+      if (invoiceDocType && documentFiles[invoiceDocType.id]?.[0]) {
+        allUploads.push({ field: 'invoice', files: [documentFiles[invoiceDocType.id][0]] });
+      }
+      if (medical.length > 0) allUploads.push({ field: 'medical', files: medical });
+
+      for (const { field, files } of allUploads) {
+        for (const f of files) formData.append(field, f.file);
+      }
+
+      if (!navigator.onLine) {
+        await db.drafts.put({
+          id: crypto.randomUUID(),
+          data: values as unknown as Record<string, unknown>,
+          step: STEPS.length - 1,
+          updatedAt: Date.now(),
+        });
+        await enqueueMutation({ method: 'POST', url: '/census', body: formData });
+        toast.info('Solicitud guardada localmente. Se enviará al recuperar la conexión.');
+        navigate('/census/list');
+        return;
+      }
+
+      const created = await createCensus(formData);
+      toast.success(`Solicitud ${created.fileNumber || created.id} creada correctamente.`);
+      navigate(`/census/${created.id}`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo crear la solicitud'));
+    } finally {
+      setSubmitting(false);
+    }
   }
-}
 
   return (
     <div className="container-page max-w-3xl">
@@ -255,7 +235,7 @@ export function CensusWizard() {
               {step === 0 && 'Información personal y de procedencia del solicitante.'}
               {step === 1 && 'Si el beneficiario es distinto al solicitante, indique sus datos.'}
               {step === 2 && 'Detalles del tipo de ayuda solicitada.'}
-              {step === 3 && 'Datos de pago y documentos requeridos del tipo de ayuda.'}
+              {step === 3 && 'Datos de pago y documentos de la solicitud (opcionales).'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -639,41 +619,44 @@ export function CensusWizard() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-secondary">Documentos</h3>
-                  {documentTypes.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Seleccione un tipo de ayuda en el paso anterior para ver los documentos requeridos.
-                    </p>
-                  )}
-                  {documentTypes
-                    .filter((d) => d.requiredForAidType || d.requiredByDefault)
-                    .map((d) => (
-                      <DocumentUploader
-                        key={d.id}
-                        label={`${d.name}${d.code === 'ID_DOCUMENT' ? (watchedApplicantIdSentinel ? ' (No aplica)' : ' (Obligatorio)') : ' (Recomendado)'}`}
-                        multiple
-                        value={documentFiles[d.id] ?? []}
-                        onChange={(files) => setDocumentFiles((prev) => ({ ...prev, [d.id]: files }))}
-                        documentTypeId={d.id}
-                      />
-                    ))}
-                  <div className="rounded-md bg-muted/50 border border-border p-3 text-muted-foreground text-sm flex items-start gap-2">
-                    <FileWarning className="h-4 w-4 mt-0.5" />
-                    <span>
-                      {watchedApplicantIdSentinel
-                        ? 'La cédula no aplica para este caso. Los documentos son opcionales.'
-                        : <>
-                            Solo la <strong>cédula</strong> es obligatoria para guardar. Los demás documentos
-                            pueden adjuntarse después.
-                          </>}
-                    </span>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-secondary">Documentos (opcional)</h3>
+                    <span className="text-xs text-muted-foreground">Puede agregarlos después</span>
                   </div>
+                  {documentTypes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Seleccione un tipo de ayuda en el paso anterior para ver los documentos sugeridos.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {documentTypes
+                        .filter((d) => d.requiredForAidType || d.requiredByDefault)
+                        .map((d) => (
+                          <DocumentUploader
+                            key={d.id}
+                            compact
+                            label={`${d.name}${d.requiredForAidType || d.code === 'ID_DOCUMENT' ? ' (recomendado)' : ' (opcional)'}`}
+                            multiple
+                            value={documentFiles[d.id] ?? []}
+                            onChange={(files) => setDocumentFiles((prev) => ({ ...prev, [d.id]: files }))}
+                            documentTypeId={d.id}
+                          />
+                        ))}
+                    </div>
+                  )}
                   <DocumentUploader
-                    label="Documentos adicionales (Opcional)"
+                    label="Documentos adicionales (opcional)"
                     value={additionalFiles}
                     onChange={setAdditionalFiles}
                   />
+                  <div className="rounded-md bg-muted/50 border border-border p-3 text-muted-foreground text-sm flex items-start gap-2">
+                    <FileWarning className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Puede guardar la solicitud sin adjuntar documentos. Cárguelos ahora si los tiene a
+                      mano, o agréguelos luego desde el detalle de la solicitud.
+                    </span>
+                  </div>
                 </div>
               </>
             )}

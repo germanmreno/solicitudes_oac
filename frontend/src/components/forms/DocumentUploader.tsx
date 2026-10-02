@@ -73,7 +73,7 @@ export function DocumentUploader({
     <div>
       {label && <label className="label-base">{label}</label>}
       <div
-        {...getRootProps()}
+        {...getRootProps({ 'aria-label': label })}
         className={cn(
           'border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors',
           compact ? 'p-2' : 'p-6',
@@ -83,7 +83,8 @@ export function DocumentUploader({
       >
         <input {...getInputProps()} />
         {compact ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
+            <Upload className="h-3.5 w-3.5" />
             {isDragActive ? 'Suelte los archivos aquí' : 'Arrastre o haga clic para adjuntar'}
           </p>
         ) : (
@@ -122,6 +123,7 @@ export function DocumentUploader({
                 </div>
                 <button
                   type="button"
+                  aria-label={`Quitar ${meta.file.name}`}
                   onClick={() => remove(idx)}
                   className="p-1 text-muted-foreground hover:text-destructive"
                 >
