@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Loader2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Search, Loader2, ChevronLeft, ChevronRight, FileText, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DataTable, type DataTableColumn, type DataTableSort } from '@/components/ui/DataTable';
+import { EditDateDialog } from '@/components/census/EditDateDialog';
 import { listCensus, type CensusListItem } from '@/features/census/census.api';
 import { listAidTypes, listAidAreas, listOriginTypes } from '@/features/catalogs/catalogs.api';
 import { formatDate } from '@/lib/utils';
@@ -47,6 +48,7 @@ export function CensusListPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [sort, setSort] = useState<DataTableSort>({ columnId: 'registrationDate', direction: 'desc' });
+  const [dateEditing, setDateEditing] = useState<CensusListItem | null>(null);
 
   const params = {
     q: q || undefined,
@@ -178,7 +180,23 @@ export function CensusListPage() {
     {
       id: 'registrationDate',
       header: 'Fecha',
-      cell: (row) => <time dateTime={row.registrationDate}>{formatDate(row.registrationDate)}</time>,
+      cell: (row) => (
+        <div className="flex items-center gap-1">
+          <time dateTime={row.registrationDate}>{formatDate(row.registrationDate)}</time>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            aria-label={`Editar fecha de registro de ${row.applicantName}`}
+            title="Editar fecha de registro"
+            onClick={(e) => { e.stopPropagation(); setDateEditing(row); }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <CalendarClock className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
       sortBy: (row) => new Date(row.registrationDate).getTime(),
       sortAscLabel: 'Fecha de registro',
     },
@@ -413,6 +431,12 @@ export function CensusListPage() {
           </>
         )}
       </Card>
+
+      <EditDateDialog
+        census={dateEditing}
+        open={!!dateEditing}
+        onOpenChange={(o) => { if (!o) setDateEditing(null); }}
+      />
     </div>
   );
 }

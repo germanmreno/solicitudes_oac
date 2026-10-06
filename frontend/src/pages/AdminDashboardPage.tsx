@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, CalendarClock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { listCensus } from '@/features/census/census.api';
+import { EditDateDialog } from '@/components/census/EditDateDialog';
+import { listCensus, type CensusListItem } from '@/features/census/census.api';
 import { listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import { formatDate } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ export function AdminDashboardPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [dateEditing, setDateEditing] = useState<CensusListItem | null>(null);
 
   const params = {
     q: q || undefined,
@@ -139,7 +141,23 @@ export function AdminDashboardPage() {
                     </TableCell>
                     <TableCell><StatusBadge status={c.aidStatus} /></TableCell>
                     <TableCell className="text-xs">{c.createdBy.fullName}</TableCell>
-                    <TableCell>{formatDate(c.registrationDate)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <span>{formatDate(c.registrationDate)}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          aria-label={`Editar fecha de registro de ${c.applicantName}`}
+                          title="Editar fecha de registro"
+                          onClick={(e) => { e.stopPropagation(); setDateEditing(c); }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -158,6 +176,12 @@ export function AdminDashboardPage() {
           <p className="py-12 text-center text-muted-foreground">No se encontraron solicitudes con los filtros aplicados.</p>
         )}
       </Card>
+
+      <EditDateDialog
+        census={dateEditing}
+        open={!!dateEditing}
+        onOpenChange={(o) => { if (!o) setDateEditing(null); }}
+      />
     </div>
   );
 }
