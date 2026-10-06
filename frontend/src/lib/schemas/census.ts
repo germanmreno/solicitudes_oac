@@ -1,3 +1,4 @@
+import { format, parse, setHours } from 'date-fns';
 import { z } from 'zod';
 
 export const cedulaRegex = /^[VENE]-\d{6,8}$/i;
@@ -44,6 +45,17 @@ export const optionalDecimal = z
   .transform((v) => (v === '' ? undefined : v))
   .optional();
 
+export function toDateInputValue(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
+}
+
+export function dateInputToIso(value: string | undefined | null): string | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value, 'yyyy-MM-dd', new Date());
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return setHours(parsed, 12).toISOString();
+}
+
 export const censusFormSchema = z
   .object({
     fileNumber: z
@@ -55,6 +67,7 @@ export const censusFormSchema = z
       })
       .transform((v) => (v === '' ? undefined : v))
       .optional(),
+    registrationDate: optionalString,
     applicantName: z.string().trim().min(3, 'El nombre del solicitante es obligatorio'),
     applicantIdNumber: cedulaSchema,
     applicantSex: sexSchema,

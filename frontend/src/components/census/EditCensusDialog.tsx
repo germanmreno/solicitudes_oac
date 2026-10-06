@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,9 +15,15 @@ import { Input, Textarea } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { IdNumberField } from '@/components/forms/IdNumberField';
-import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
+import {
+  censusFormSchema,
+  dateInputToIso,
+  toDateInputValue,
+  type CensusFormValues,
+} from '@/lib/schemas/census';
 import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import { updateCensus, type CensusDetail } from '@/features/census/census.api';
+import { formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api/client';
 import { toast } from '@/components/ui/toast';
 
@@ -26,6 +32,45 @@ const SEX_OPTIONS = [
   { value: 'FEMENINO', label: 'Femenino' },
   { value: 'NO_APLICA', label: 'No aplica' },
 ];
+
+const FIELD_LABELS: Record<string, string> = {
+  registrationDate: 'Fecha de registro',
+  fileNumber: 'N° de expediente',
+  applicantName: 'Nombre del solicitante',
+  applicantIdNumber: 'Cédula del solicitante',
+  applicantSex: 'Sexo del solicitante',
+  applicantType: 'Tipo de solicitante',
+  personnelType: 'Tipo de personal',
+  originTypeId: 'Tipo de procedencia',
+  siteId: 'Sede',
+  externalOriginId: 'Procedencia externa',
+  originDetail: 'Detalle de procedencia',
+  phone: 'Teléfono',
+  email: 'Correo electrónico',
+  beneficiarySameAsApplicant: 'Beneficiario igual al solicitante',
+  beneficiaryName: 'Nombre del beneficiario',
+  beneficiaryIdNumber: 'Cédula del beneficiario',
+  beneficiarySex: 'Sexo del beneficiario',
+  aidTypeId: 'Tipo de ayuda',
+  aidAreaId: 'Área de ayuda',
+  aidAreaOther: 'Otra especificación del área',
+  aidDescription: 'Descripción',
+  managementMode: 'Modalidad de gestión',
+  cooperatingEntity: 'Ente u organismo cooperante',
+  aidProvider: 'Proveedor',
+  aidObservation: 'Observación',
+  amountUsd: 'Monto (USD)',
+  amountBs: 'Monto (Bs.)',
+  paymentRate: 'Tasa del día',
+  responsibleName: 'Responsable',
+};
+
+interface FieldChange {
+  field: string;
+  label: string;
+  from: string;
+  to: string;
+}
 
 export function EditCensusDialog({
   census,
@@ -37,6 +82,8 @@ export function EditCensusDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const qc = useQueryClient();
+  const [pendingValues, setPendingValues] = useState<CensusFormValues | null>(null);
+  const [changes, setChanges] = useState<FieldChange[]>([]);
 
   const { data: originTypes = [] } = useQuery({ queryKey: ['origin-types'], queryFn: () => listOriginTypes(), staleTime: 60000 });
   const { data: sites = [] } = useQuery({ queryKey: ['sites'], queryFn: () => listSites(), staleTime: 60000 });
@@ -61,17 +108,68 @@ export function EditCensusDialog({
     staleTime: 60000,
   });
 
+  function formatValue(field: string, value: unknown): string {
+    if (value === undefined || value === null || value === '') return '—';
+    switch (field) {
+      case 'originTypeId':
+        return originTypes.find((o) => o.id === value)?.name ?? String(value);
+      case 'siteId':
+        return sites.find((s) => s.id === value)?.name ?? String(value);
+      case 'externalOriginId':
+        return externalOrigins.find((e) => e.id === value)?.name ?? String(value);
+      case 'aidTypeId':
+        return aidTypes.find((t) => t.id === value)?.name ?? String(value);
+      case 'aidAreaId':
+        return aidAreas.find((a) => a.id === value)?.name ?? String(value);
+      case 'applicantSex':
+      case 'beneficiarySex':
+        return SEX_OPTIONS.find((s) => s.value === value)?.label ?? String(value);
+      case 'beneficiarySameAsApplicant':
+        return value === true || value === 'true' ? 'Sí' : 'No';
+      case 'registrationDate':
+        return formatDate(dateInputToIso(String(value)));
+      default:
+        return String(value);
+    }
+  }
+
+  function computeChanges(
+    original: CensusFormValues,
+    updated: CensusFormValues,
+  ): FieldChange[] {
+    const normalize = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+    const result: FieldChange[] = [];
+    for (const field of Object.keys(FIELD_LABELS)) {
+      const before = normalize((original as Record<string, unknown>)[field]);
+      const after = normalize((updated as Record<string, unknown>)[field]);
+      if (before !== after) {
+        result.push({
+          field,
+          label: FIELD_LABELS[field],
+          from: formatValue(field, (original as Record<string, unknown>)[field]),
+          to: formatValue(field, (updated as Record<string, unknown>)[field]),
+        });
+      }
+    }
+    return result;
+  }
+
   useEffect(() => {
-    if (open) form.reset(buildDefaults(census));
+    if (open) {
+      form.reset(buildDefaults(census));
+      setPendingValues(null);
+    }
   }, [open, census, form]);
 
   const mutation = useMutation({
     mutationFn: (values: CensusFormValues) => {
-      const { aidStatus: _aidStatus, paymentStatus: _paymentStatus, paymentDate: _paymentDate, ...payload } = values as Record<string, unknown>;
+      const { aidStatus: _aidStatus, paymentStatus: _paymentStatus, paymentDate: _paymentDate, ...rest } = values as Record<string, unknown>;
+      const payload = { ...rest, registrationDate: dateInputToIso(values.registrationDate) };
       return updateCensus(census.id, payload);
     },
     onSuccess: () => {
       toast.success('Solicitud actualizada correctamente');
+      setPendingValues(null);
       onOpenChange(false);
       void qc.invalidateQueries({ queryKey: ['census', census.id] });
       void qc.invalidateQueries({ queryKey: ['census'] });
@@ -80,17 +178,65 @@ export function EditCensusDialog({
   });
 
   function onSubmit(values: CensusFormValues) {
-    mutation.mutate(values);
+    const diff = computeChanges(buildDefaults(census), values);
+    if (diff.length === 0) {
+      toast.info('No hay cambios que guardar');
+      return;
+    }
+    setChanges(diff);
+    setPendingValues(values);
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) setPendingValues(null);
+    onOpenChange(nextOpen);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar solicitud</DialogTitle>
+          <DialogTitle>{pendingValues ? 'Confirmar cambios' : 'Editar solicitud'}</DialogTitle>
         </DialogHeader>
 
+        {pendingValues ? (
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              Revise los cambios antes de guardarlos. Quedarán registrados en la línea de tiempo.
+            </p>
+            <ul className="divide-y divide-border rounded-md border border-border" aria-label="Cambios a aplicar">
+              {changes.map((ch) => (
+                <li key={ch.field} className="px-3 py-2">
+                  <p className="font-medium text-secondary">{ch.label}</p>
+                  <p className="text-xs">
+                    <span className="text-muted-foreground line-through">{ch.from}</span>
+                    <span className="mx-2 text-muted-foreground" aria-hidden>→</span>
+                    <span className="font-medium">{ch.to}</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPendingValues(null)} disabled={mutation.isPending}>
+                Volver
+              </Button>
+              <Button onClick={() => mutation.mutate(pendingValues)} disabled={mutation.isPending}>
+                {mutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Confirmar y guardar
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 text-sm">
+          <section>
+            <h3 className="font-semibold text-secondary mb-2">Registro</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Fecha de registro">
+                <Input type="date" {...form.register('registrationDate')} />
+              </Field>
+            </div>
+          </section>
+
           <section>
             <h3 className="font-semibold text-secondary mb-2">Solicitante</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -316,6 +462,7 @@ export function EditCensusDialog({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -323,6 +470,7 @@ export function EditCensusDialog({
 
 function buildDefaults(c: CensusDetail): CensusFormValues {
   return {
+    registrationDate: c.registrationDate ? toDateInputValue(new Date(c.registrationDate)) : '',
     applicantName: c.applicantName,
     applicantIdNumber: c.applicantIdNumber,
     applicantSex: c.applicantSex,

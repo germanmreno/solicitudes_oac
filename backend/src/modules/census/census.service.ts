@@ -1,8 +1,11 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { Prisma, type AidStatus, type PaymentStatus, type Sex } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
+import { logger } from '../../lib/logger.js';
 import { AppError } from '../../middlewares/error.js';
+import { absolutePath } from '../../lib/uploads.js';
 import { writeAudit } from '../audit/audit.service.js';
 import type { CreateCensusInput, ListCensusQuery, UpdateCensusInput } from './census.schema.js';
 
@@ -342,6 +345,7 @@ export async function updateCensus(
   }
 
   const data: Prisma.CensusUpdateInput = {};
+  if (input.registrationDate !== undefined) data.registrationDate = input.registrationDate;
   if (input.applicantName !== undefined) data.applicantName = input.applicantName;
   if (input.applicantIdNumber !== undefined) data.applicantIdNumber = input.applicantIdNumber.toUpperCase();
   if (input.applicantSex !== undefined) data.applicantSex = input.applicantSex as Sex;
@@ -402,6 +406,7 @@ export async function updateCensus(
       current as unknown as Record<string, unknown>,
       input as Record<string, unknown>,
       [
+        'registrationDate',
         'applicantName', 'applicantIdNumber', 'applicantSex', 'applicantType', 'personnelType',
         'originTypeId', 'siteId', 'externalOriginId',
         'originDetail', 'phone', 'email', 'beneficiarySameAsApplicant', 'beneficiaryName',
@@ -533,6 +538,45 @@ export async function deleteDocument(censusId: string, docId: string, actorId: s
     entityId: docId,
     payload: { censusId, fileName: doc.fileName },
   });
+
+  return { ok: true };
+}
+
+export async function deleteCensus(id: string, actorId: string) {
+  const census = await prisma.census.findUnique({
+    where: { id },
+    include: { documents: { select: { id: true, filePath: true } } },
+  });
+  if (!census) throw new AppError(404, 'NOT_FOUND', 'Solicitud no encontrada');
+
+  await writeAudit({
+    userId: actorId,
+    action: 'DELETE_CENSUS',
+    entity: 'Census',
+    entityId: id,
+    payload: {
+      fileNumber: census.fileNumber,
+      applicantName: census.applicantName,
+      applicantIdNumber: census.applicantIdNumber,
+    },
+  });
+
+  await prisma.census.delete({ where: { id } });
+
+  const filePaths = [
+    census.idDocumentPath,
+    census.invoicePath,
+    ...census.documents.map((d) => d.filePath),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const filePath of filePaths) {
+    try {
+      const abs = absolutePath(filePath);
+      if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch (err) {
+      logger.warn({ err, filePath }, 'No se pudo eliminar archivo del censo borrado');
+    }
+  }
 
   return { ok: true };
 }

@@ -1,5 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { censusFormSchema, cedulaSchema } from './census';
+import {
+  censusFormSchema,
+  cedulaSchema,
+  dateInputToIso,
+  toDateInputValue,
+} from './census';
+
+describe('fecha de registro', () => {
+  it('dateInputToIso preserva el día calendario en hora local', () => {
+    const iso = dateInputToIso('2026-10-06');
+    expect(iso).toBeDefined();
+    const d = new Date(iso!);
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(9);
+    expect(d.getDate()).toBe(6);
+  });
+
+  it('dateInputToIso devuelve undefined para vacío o inválido', () => {
+    expect(dateInputToIso('')).toBeUndefined();
+    expect(dateInputToIso(undefined)).toBeUndefined();
+  });
+
+  it('toDateInputValue formatea la fecha local como YYYY-MM-DD', () => {
+    expect(toDateInputValue(new Date(2026, 9, 6))).toBe('2026-10-06');
+  });
+});
 
 describe('cedulaSchema', () => {
   it('acepta V-12345678', () => {

@@ -15,6 +15,7 @@ import {
 import {
   addDocuments,
   createCensus,
+  deleteCensus,
   deleteDocument,
   generateFileNumber,
   getCensus,
@@ -131,11 +132,19 @@ censusRoutes.patch(
 
 censusRoutes.patch(
   '/:id',
-  requireRole('ADMIN'),
   asyncHandler(async (req, res) => {
     const data = updateCensusSchema.parse(req.body);
     const updated = await updateCensus(req.params.id!, data, req.user!.sub);
     res.json({ data: updated });
+  }),
+);
+
+censusRoutes.delete(
+  '/:id',
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    await deleteCensus(req.params.id!, req.user!.sub);
+    res.json({ data: { ok: true } });
   }),
 );
 

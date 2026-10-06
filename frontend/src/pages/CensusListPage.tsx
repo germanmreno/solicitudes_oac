@@ -18,7 +18,6 @@ import { DataTable, type DataTableColumn, type DataTableSort } from '@/component
 import { listCensus, type CensusListItem } from '@/features/census/census.api';
 import { listAidTypes, listAidAreas, listOriginTypes } from '@/features/catalogs/catalogs.api';
 import { formatDate } from '@/lib/utils';
-import { useAuthStore } from '@/features/auth/auth.store';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
@@ -37,7 +36,6 @@ const PAYMENT_STATUS_OPTIONS = [
 
 export function CensusListPage() {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [aidTypeId, setAidTypeId] = useState('');
@@ -191,9 +189,7 @@ export function CensusListPage() {
       <header className="flex flex-wrap items-center gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-serif text-secondary">Solicitudes registradas</h1>
-          <p className="text-sm text-muted-foreground">
-            {user?.role === 'ADMIN' ? 'Todas las solicitudes del sistema.' : 'Solicitudes que usted ha registrado.'}
-          </p>
+          <p className="text-sm text-muted-foreground">Todas las solicitudes del sistema.</p>
         </div>
         <div className="ml-auto">
           <Button asChild>

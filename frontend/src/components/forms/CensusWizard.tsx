@@ -17,7 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { censusFormSchema, type CensusFormValues } from '@/lib/schemas/census';
+import {
+  censusFormSchema,
+  dateInputToIso,
+  toDateInputValue,
+  type CensusFormValues,
+} from '@/lib/schemas/census';
 import { createCensus, getNextFileNumber } from '@/features/census/census.api';
 import { listOriginTypes, listSites, listExternalOrigins, listAidTypes, listAidAreas } from '@/features/catalogs/catalogs.api';
 import type { CatalogItem } from '@/features/catalogs/catalogs.api';
@@ -70,6 +75,7 @@ export function CensusWizard() {
     defaultValues: {
       aidStatus: 'EN_EVALUACION',
       beneficiarySameAsApplicant: true,
+      registrationDate: toDateInputValue(new Date()),
     },
     mode: 'onBlur',
   });
@@ -166,8 +172,12 @@ export function CensusWizard() {
   async function onSubmit(values: CensusFormValues) {
     setSubmitting(true);
     try {
+      const payloadValues = {
+        ...values,
+        registrationDate: dateInputToIso(values.registrationDate),
+      };
       const formData = new FormData();
-      Object.entries(values).forEach(([k, v]) => {
+      Object.entries(payloadValues).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') {
           formData.append(k, String(v));
         }
@@ -198,7 +208,7 @@ export function CensusWizard() {
       if (!navigator.onLine) {
         await db.drafts.put({
           id: crypto.randomUUID(),
-          data: values as unknown as Record<string, unknown>,
+          data: payloadValues as unknown as Record<string, unknown>,
           step: STEPS.length - 1,
           updatedAt: Date.now(),
         });
@@ -253,6 +263,12 @@ export function CensusWizard() {
                   {form.formState.errors.fileNumber && (
                     <p className="error-text">{form.formState.errors.fileNumber.message}</p>
                   )}
+                </div>
+
+                <div>
+                  <Label htmlFor="registrationDate">Fecha de registro</Label>
+                  <Input id="registrationDate" type="date" {...form.register('registrationDate')} />
+                  <p className="help-text">Fecha en que se registra la solicitud. Por defecto, hoy.</p>
                 </div>
 
                 <div>

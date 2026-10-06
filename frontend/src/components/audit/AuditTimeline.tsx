@@ -6,6 +6,7 @@ import {
   Edit3,
   ArrowRightLeft,
   Plus,
+  Trash2,
   LogIn,
   LogOut,
   UserCog,
@@ -27,6 +28,7 @@ interface AuditTimelineProps {
 const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
   CREATE_CENSUS:        { label: 'Solicitud creada',       icon: Plus,           tone: 'bg-emerald-100 text-emerald-700' },
   UPDATE_CENSUS:        { label: 'Solicitud actualizada',  icon: Edit3,          tone: 'bg-blue-100 text-blue-700' },
+  DELETE_CENSUS:        { label: 'Solicitud eliminada',    icon: Trash2,         tone: 'bg-rose-100 text-rose-700' },
   CHANGE_STATUS:        { label: 'Estatus cambiado',       icon: ArrowRightLeft,  tone: 'bg-amber-100 text-amber-700' },
   UPDATE_PAYMENT:       { label: 'Pago actualizado',       icon: Edit3,          tone: 'bg-blue-100 text-blue-700' },
   UPLOAD_DOCUMENT:      { label: 'Documento adjunto',      icon: FilePlus,       tone: 'bg-violet-100 text-violet-700' },
@@ -54,6 +56,9 @@ function describeAction(item: AuditItem): string {
     return `${base}: ${payload.fileName}`;
   }
   if (item.action === 'CREATE_CENSUS' && typeof payload.fileNumber === 'string') {
+    return `${base}: N° ${payload.fileNumber}`;
+  }
+  if (item.action === 'DELETE_CENSUS' && typeof payload.fileNumber === 'string') {
     return `${base}: N° ${payload.fileNumber}`;
   }
   if (item.action === 'UPDATE_CENSUS' && payload.fields) {

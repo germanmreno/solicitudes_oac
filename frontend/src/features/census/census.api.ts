@@ -168,6 +168,10 @@ export async function deleteCensusDocument(censusId: string, docId: string) {
   await api.delete(`/census/${censusId}/documents/${docId}`);
 }
 
+export async function deleteCensus(censusId: string) {
+  await api.delete(`/census/${censusId}`);
+}
+
 export async function updateCensus(id: string, payload: Record<string, unknown>) {
   const { data } = await api.patch<{ data: CensusDetail }>(`/census/${id}`, payload);
   return data.data;

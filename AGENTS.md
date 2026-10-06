@@ -5,7 +5,7 @@
 ## Stack
 - **Monorepo**: npm workspaces. Paquetes: `backend`, `frontend`.
 - **Backend**: Node 20, Express + TypeScript, Prisma + PostgreSQL 16, JWT, Argon2, Multer, Zod, Pino.
-- **Frontend**: Vite + React 18 + TypeScript, Tailwind, shadcn/ui, TanStack Query, React Hook Form, Zod, Dexie (IndexedDB), vite-plugin-pwa, Apache ECharts.
+- **Frontend**: Vite + React 18 + TypeScript, Tailwind, shadcn/ui, TanStack Query, React Hook Form, Zod, Dexie (IndexedDB), vite-plugin-pwa, Apache ECharts, **date-fns** (fechas).
 - **Sin Docker.** Postgres se instala y corre de forma nativa.
 
 ## Estructura
@@ -43,11 +43,14 @@
 
 ## Convenciones del proyecto
 - **Idioma**: todo el código visible para el usuario en español (`lang="es"`). Mensajes, validaciones, etiquetas, estados.
-- **Roles**: `ADMIN` y `OPERATOR`. Endpoints sensibles van con `requireRole('ADMIN')` en `backend/src/middlewares/role.ts`. `PATCH /census/:id` (edición de solicitud) es solo ADMIN.
+- **Roles**: `ADMIN` y `OPERATOR`. Endpoints sensibles van con `requireRole('ADMIN')` en `backend/src/middlewares/role.ts`. `PATCH /census/:id` (edición de solicitud) está disponible para **ADMIN y OPERATOR**; en el front el guardado pasa por un **paso de confirmación con el diff antes/después** antes de llamar a `updateCensus`. `DELETE /census/:id` (borrado físico) es **solo ADMIN**.
 - **Errores**: respuesta uniforme `{ error: { code, message, details } }`. Handler global en `middlewares/error.ts`.
 - **Schemas Zod**: duplicados en `backend/src/modules/*/<feature>.schema.ts` y `frontend/src/lib/schemas/`. **Si modificas uno, replica en el otro** (no hay paquete compartido todavía).
 - **Lista de solicitudes**: `listCensus` devuelve por fila `hasCedula` (existe `idDocumentPath`) y `hasCarta` (existe un `CensusDocument` con `DocumentType.code = REQUEST_LETTER`), además de `_count.documents`. La tabla muestra la cantidad de documentos y badges C.I./Carta.
-- **Detalle de solicitud** (`CensusDetailPage`): documentos en una sección compacta con subida múltiple por tipo (selecciona el tipo → adjunta → cambia tipo por archivo si hace falta); el **pago** se confirma como paso (diálogo "Confirmar pago" → `PATCH /census/:id/payment` con `paymentStatus: PAGADO`), nunca se edita inline; si ya hay estatus de pago (p. ej. carga masiva) solo se muestra en el resumen. Botón "Editar" (ADMIN) abre `EditCensusDialog` que usa `censusFormSchema` y `updateCensus`.
+- **Detalle de solicitud** (`CensusDetailPage`): documentos en una sección compacta con subida múltiple por tipo (selecciona el tipo → adjunta → cambia tipo por archivo si hace falta); el **pago** se confirma como paso (diálogo "Confirmar pago" → `PATCH /census/:id/payment` con `paymentStatus: PAGADO`), nunca se edita inline; si ya hay estatus de pago (p. ej. carga masiva) solo se muestra en el resumen.
+- **Edición de solicitud** (`EditCensusDialog`, ADMIN y OPERATOR): usa `censusFormSchema` y `updateCensus`. Incluye la **fecha de registro**. Al enviar el formulario **no guarda directo**: muestra un paso de **"Confirmar cambios"** que lista los campos modificados (`Campo: valor anterior → valor nuevo`, IDs resueltos a nombres); recién al confirmar llama a `updateCensus`. Si no hay cambios, avisa y no envía. Cada campo modificado queda auditado como `UPDATE_CENSUS` (`payload.fields`).
+- **Eliminar solicitud** (solo ADMIN): botón "Eliminar" en el detalle con confirmación → `DELETE /census/:id`. Borrado **físico** (la fila y sus `CensusDocument` en cascada, más los archivos en disco best-effort). Como desaparece la fila, el conteo de `listCensus` (`meta.total`), `stats` y la consulta pública bajan automáticamente. Registra `DELETE_CENSUS` con `{ fileNumber, applicantName, applicantIdNumber }`.
+- **Fechas**: usar **date-fns** (v4) para formatear/parsear. `formatDate`/`formatDateTime` en `lib/utils.ts` (`dd/MM/yyyy` y `dd/MM/yyyy, HH:mm`). El input de fecha del wizard/detalle es `type="date"` (`yyyy-MM-dd`); se convierte a ISO con `dateInputToIso` y de Date a input con `toDateInputValue` (`lib/schemas/census.ts`). No parsear fechas a mano.
 - **No commitear** sin pedido explícito del usuario. Tampoco modificar configuración de git.
 - **No agregar comentarios** en código salvo que el usuario lo pida.
 - **Auditoría**: usar `writeAudit` en TODA mutación sensible (cambio de estatus, edición de campos, upload/delete de documentos, cambios de pago, login). Los cambios a múltiples campos se persisten como `payload: { fields: { nombre: { from, to } } }` para reconstruir la línea de tiempo en el front.
@@ -79,7 +82,7 @@
 - **AidTypeDocumentType** (nuevo): PK compuesta (aidTypeId, documentTypeId), `required: boolean`. Seed: por cada AidType declara qué códigos de DocumentType son obligatorios.
 
 ### Census (campos clave)
-- `fileNumber` (OAC-NNNN-YYYY), `registrationDate`.
+- `fileNumber` (OAC-NNNN-YYYY), `registrationDate` (seleccionable en el wizard con input `type="date"`; por defecto hoy; editable desde el detalle).
 - **Solicitante**: `applicantName`, `applicantIdNumber`, `applicantSex` (Sex).
 - **Procedencia**: `originTypeId` (FK OriginType), `siteId?` (FK Site), `externalOriginId?` (FK ExternalOrigin), `originDetail?` (texto libre).
 - **Beneficiario**: `beneficiarySameAsApplicant` (default true), si false → `beneficiaryName?`, `beneficiaryIdNumber?`, `beneficiarySex?`.
@@ -93,7 +96,7 @@
 ## Auditoría y línea de tiempo
 - **Backend** `audit.service.ts`: `writeAudit(entry)` y `listAudit(query)`. `listAudit` admite filtros `entity`, `entityId`, `action`, `userId`, `from`, `to`, `page`, `limit` e incluye `user: { id, username, fullName }`.
 - **Endpoint**: `GET /api/v1/audit` autenticado.
-- **Acciones** registradas: `CREATE_CENSUS`, `UPDATE_CENSUS` (con `payload.fields: { campo: { from, to } }`), `CHANGE_STATUS`, `UPDATE_PAYMENT` (idem), `UPLOAD_DOCUMENT`, `DELETE_DOCUMENT`, `LOGIN`, `LOGOUT`, `CREATE_USER`, `UPDATE_USER`, `CREATE_CATALOG_ITEM`, `UPDATE_CATALOG_ITEM`.
+- **Acciones** registradas: `CREATE_CENSUS`, `UPDATE_CENSUS` (con `payload.fields: { campo: { from, to } }`), `DELETE_CENSUS` (con `{ fileNumber, applicantName, applicantIdNumber }`), `CHANGE_STATUS`, `UPDATE_PAYMENT` (idem), `UPLOAD_DOCUMENT`, `DELETE_DOCUMENT`, `LOGIN`, `LOGOUT`, `CREATE_USER`, `UPDATE_USER`, `CREATE_CATALOG_ITEM`, `UPDATE_CATALOG_ITEM`.
 - **Frontend**: `<AuditTimeline entityId={censusId} />` en `components/audit/`. Muestra la línea de tiempo con icono por acción, descripción humana del cambio, usuario y timestamp relativo. Filtros por tipo de evento, paginación.
 
 ## Offline (PWA)

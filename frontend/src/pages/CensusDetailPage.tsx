@@ -22,6 +22,7 @@ import { AuditTimeline } from '@/components/audit/AuditTimeline';
 import {
   addMedicalDocuments,
   changeCensusStatus,
+  deleteCensus,
   deleteCensusDocument,
   downloadCensusDocument,
   downloadInitialCensusFile,
@@ -132,6 +133,17 @@ export function CensusDetailPage() {
     onError: (err) => toast.error(getErrorMessage(err, 'No se pudo eliminar el documento')),
   });
 
+  const deleteCensusMutation = useMutation({
+    mutationFn: () => deleteCensus(id!),
+    onSuccess: () => {
+      toast.success('Solicitud eliminada');
+      void qc.invalidateQueries({ queryKey: ['census'] });
+      void qc.invalidateQueries({ queryKey: ['stats'] });
+      navigate('/census/list');
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'No se pudo eliminar la solicitud')),
+  });
+
   if (isLoading) {
     return (
       <div className="container-page flex justify-center py-12">
@@ -178,9 +190,23 @@ export function CensusDetailPage() {
         <div className="ml-auto flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
             {c.fileNumber && <Badge variant="secondary" className="font-mono">{c.fileNumber}</Badge>}
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4 mr-1" /> Editar
+            </Button>
             {user?.role === 'ADMIN' && (
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                <Pencil className="h-4 w-4 mr-1" /> Editar
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10"
+                disabled={deleteCensusMutation.isPending}
+                onClick={() => {
+                  if (confirm(`¿Eliminar la solicitud de "${c.applicantName}"? Esta acción no se puede deshacer.`)) {
+                    deleteCensusMutation.mutate();
+                  }
+                }}
+              >
+                {deleteCensusMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Eliminar
               </Button>
             )}
           </div>
