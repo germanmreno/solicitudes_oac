@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startOfDay, endOfDay } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -50,13 +50,21 @@ function makeBarOption(data: { name: string; count: number }[], title: string, h
   };
 }
 
-function makeMonthlyOption(data: StatsSummary['monthlyAmounts']): ECOption {
+interface ExpenseDatum {
+  label: string;
+  pagadoUsd: string;
+  pendienteUsd: string;
+  pagadoBs: string;
+  pendienteBs: string;
+}
+
+function makeExpenseOption(data: ExpenseDatum[], title: string): ECOption {
   return {
-    title: { text: 'Gastos mensuales (pagado vs pendiente)', left: 'center', textStyle: { fontSize: 14 } },
+    title: { text: title, left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     legend: { bottom: 0, data: ['Pagado USD', 'Pendiente USD', 'Pagado Bs.', 'Pendiente Bs.'] },
     grid: { left: '3%', right: '8%', bottom: '25%', containLabel: true },
-    xAxis: { type: 'category', data: data.map((d) => d.month) },
+    xAxis: { type: 'category', data: data.map((d) => d.label), axisLabel: { rotate: 30 } },
     yAxis: [
       { type: 'value', name: 'USD', position: 'left', axisLabel: { formatter: '${value}' } },
       { type: 'value', name: 'Bs.', position: 'right', axisLabel: { formatter: 'Bs. {value}' } },
@@ -96,6 +104,19 @@ function makeMonthlyOption(data: StatsSummary['monthlyAmounts']): ECOption {
       },
     ],
   };
+}
+
+function makeMonthlyOption(data: StatsSummary['monthlyAmounts']): ECOption {
+  return makeExpenseOption(
+    data.map((d) => ({
+      label: d.month,
+      pagadoUsd: d.pagadoUsd,
+      pendienteUsd: d.pendienteUsd,
+      pagadoBs: d.pagadoBs,
+      pendienteBs: d.pendienteBs,
+    })),
+    'Gastos mensuales (pagado vs pendiente)',
+  );
 }
 
 export function ChartsPage() {
@@ -179,6 +200,65 @@ export function ChartsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-lg">Gastos por tipo de ayuda</CardTitle>
+                <CardDescription>Monto pagado vs. pendiente por cada tipo de ayuda, en USD y Bs.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {stats.byAidType.length > 0
+                  ? <EChart option={makeExpenseOption(stats.byAidType.map((g) => ({ label: g.name, ...g })), 'Pagado vs. pendiente por tipo de ayuda')} height={340} />
+                  : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-lg">Gastos por procedencia</CardTitle>
+                <CardDescription>Monto pagado vs. pendiente por procedencia general (interna/externa).</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {stats.byOriginType.length > 0
+                  ? <EChart option={makeExpenseOption(stats.byOriginType.map((g) => ({ label: g.name, ...g })), 'Pagado vs. pendiente por procedencia')} height={340} />
+                  : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
+              </CardContent>
+            </Card>
+
+            {stats.proyecto && (
+              <Card className="md:col-span-2">
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-lg">Proyecto</CardTitle>
+                  <CardDescription>
+                    Gastos del tipo de ayuda «{stats.proyecto.name}», separados por completo de los demás
+                    ({stats.proyecto.count} solicitud{stats.proyecto.count === 1 ? '' : 'es'}).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagado USD</CardTitle></CardHeader>
+                      <CardContent><p className="text-xl font-bold text-primary">{formatCurrency(stats.proyecto.pagadoUsd, 'USD')}</p></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pendiente USD</CardTitle></CardHeader>
+                      <CardContent><p className="text-xl font-bold text-secondary">{formatCurrency(stats.proyecto.pendienteUsd, 'USD')}</p></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagado Bs.</CardTitle></CardHeader>
+                      <CardContent><p className="text-xl font-bold text-primary">{formatCurrency(Number(stats.proyecto.pagadoBs), 'VES')}</p></CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pendiente Bs.</CardTitle></CardHeader>
+                      <CardContent><p className="text-xl font-bold text-secondary">{formatCurrency(Number(stats.proyecto.pendienteBs), 'VES')}</p></CardContent>
+                    </Card>
+                  </div>
+                  {stats.proyecto.monthly.length > 0
+                    ? <EChart option={makeExpenseOption(stats.proyecto.monthly.map((m) => ({ label: m.month, ...m })), 'Gastos de Proyecto por mes (pagado vs. pendiente)')} height={320} />
+                    : <p className="text-center text-muted-foreground py-8">Sin datos de Proyecto en el rango seleccionado.</p>}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardContent className="pt-4">
                 {stats.byOriginType.length > 0

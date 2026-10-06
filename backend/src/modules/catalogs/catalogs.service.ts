@@ -1,17 +1,30 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middlewares/error.js';
 import { writeAudit } from '../audit/audit.service.js';
 import type { CreateOriginTypeInput, CreateAidTypeInput, CreateAidAreaInput, UpdateCatalogInput } from './catalogs.schema.js';
+
+const CASE_FIELD = {
+  'origin-types': 'originTypeId',
+  'sites': 'siteId',
+  'external-origins': 'externalOriginId',
+  'aid-types': 'aidTypeId',
+  'aid-areas': 'aidAreaId',
+} as const;
+
+export type CatalogKind = keyof typeof CASE_FIELD;
 
 function findActiveOrThrow<T extends { active: boolean }>(item: T | null, label: string): asserts item is T {
   if (!item || !item.active) throw new AppError(404, 'NOT_FOUND', `${label} no encontrado`);
 }
 
 export async function listOriginTypes(includeInactive = false) {
-  return prisma.originType.findMany({
+  const items = await prisma.originType.findMany({
     where: includeInactive ? {} : { active: true },
     orderBy: { name: 'asc' },
+    include: { _count: { select: { census: true } } },
   });
+  return items.map(({ _count, ...rest }) => ({ ...rest, usageCount: _count.census }));
 }
 
 export async function createOriginType(data: CreateOriginTypeInput, actorId: string) {
@@ -29,10 +42,12 @@ export async function updateOriginType(id: string, data: UpdateCatalogInput, act
 }
 
 export async function listSites(includeInactive = false) {
-  return prisma.site.findMany({
+  const items = await prisma.site.findMany({
     where: includeInactive ? {} : { active: true },
     orderBy: { name: 'asc' },
+    include: { _count: { select: { census: true } } },
   });
+  return items.map(({ _count, ...rest }) => ({ ...rest, usageCount: _count.census }));
 }
 
 export async function createSite(data: { name: string }, actorId: string) {
@@ -50,10 +65,12 @@ export async function updateSite(id: string, data: UpdateCatalogInput, actorId: 
 }
 
 export async function listExternalOrigins(includeInactive = false) {
-  return prisma.externalOrigin.findMany({
+  const items = await prisma.externalOrigin.findMany({
     where: includeInactive ? {} : { active: true },
     orderBy: { name: 'asc' },
+    include: { _count: { select: { census: true } } },
   });
+  return items.map(({ _count, ...rest }) => ({ ...rest, usageCount: _count.census }));
 }
 
 export async function createExternalOrigin(data: { name: string }, actorId: string) {
@@ -71,10 +88,16 @@ export async function updateExternalOrigin(id: string, data: UpdateCatalogInput,
 }
 
 export async function listAidTypes(includeInactive = false) {
-  return prisma.aidType.findMany({
+  const items = await prisma.aidType.findMany({
     where: includeInactive ? {} : { active: true },
     orderBy: { name: 'asc' },
+    include: { _count: { select: { census: true, areas: true } } },
   });
+  return items.map(({ _count, ...rest }) => ({
+    ...rest,
+    usageCount: _count.census,
+    areaCount: _count.areas,
+  }));
 }
 
 export async function createAidType(data: CreateAidTypeInput, actorId: string) {
@@ -94,11 +117,42 @@ export async function updateAidType(id: string, data: UpdateCatalogInput, actorI
 export async function listAidAreas(typeId?: string, includeInactive = false) {
   const where: Record<string, unknown> = includeInactive ? {} : { active: true };
   if (typeId) where.aidTypeId = typeId;
-  return prisma.aidArea.findMany({
+  const items = await prisma.aidArea.findMany({
     where,
-    include: { aidType: { select: { id: true, name: true } } },
+    include: {
+      aidType: { select: { id: true, name: true } },
+      _count: { select: { census: true } },
+    },
     orderBy: { name: 'asc' },
   });
+  return items.map(({ _count, ...rest }) => ({ ...rest, usageCount: _count.census }));
+}
+
+export async function listCatalogCases(kind: string, id: string) {
+  const field = CASE_FIELD[kind as CatalogKind];
+  if (!field) throw new AppError(400, 'INVALID_KIND', 'Colección no válida');
+
+  const where = { [field]: id } as Prisma.CensusWhereInput;
+  const [total, items] = await Promise.all([
+    prisma.census.count({ where }),
+    prisma.census.findMany({
+      where,
+      select: {
+        id: true,
+        fileNumber: true,
+        applicantName: true,
+        applicantIdNumber: true,
+        registrationDate: true,
+        aidStatus: true,
+        aidType: { select: { name: true } },
+        aidArea: { select: { name: true } },
+      },
+      orderBy: { registrationDate: 'desc' },
+      take: 500,
+    }),
+  ]);
+
+  return { total, items };
 }
 
 export async function createAidArea(data: CreateAidAreaInput, actorId: string) {

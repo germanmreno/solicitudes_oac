@@ -1,20 +1,42 @@
 import { api } from '@/lib/api/client';
 
+export interface StatsGroup {
+  name: string;
+  count: number;
+  pagadoUsd: string;
+  pendienteUsd: string;
+  pagadoBs: string;
+  pendienteBs: string;
+}
+
+export interface StatsMonthly {
+  month: string;
+  amountUsd: string;
+  amountBs: string;
+  pagadoUsd: string;
+  pendienteUsd: string;
+  pagadoBs: string;
+  pendienteBs: string;
+}
+
+export interface StatsProyecto {
+  name: string;
+  count: number;
+  pagadoUsd: string;
+  pendienteUsd: string;
+  pagadoBs: string;
+  pendienteBs: string;
+  monthly: StatsMonthly[];
+}
+
 export interface StatsSummary {
-  byOriginType: { name: string; count: number }[];
+  byOriginType: StatsGroup[];
   bySite: { name: string; count: number }[];
   byExternalOrigin: { name: string; count: number }[];
-  byAidType: { name: string; count: number }[];
+  byAidType: StatsGroup[];
   topAidAreas: { name: string; count: number }[];
-  monthlyAmounts: {
-    month: string;
-    amountUsd: string;
-    amountBs: string;
-    pagadoUsd: string;
-    pendienteUsd: string;
-    pagadoBs: string;
-    pendienteBs: string;
-  }[];
+  monthlyAmounts: StatsMonthly[];
+  proyecto: StatsProyecto | null;
   totals: {
     count: number;
     amountUsd: string;

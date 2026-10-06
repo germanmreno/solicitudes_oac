@@ -23,6 +23,7 @@ import {
   createAidArea,
   updateAidArea,
   deleteAidArea,
+  listCatalogCases,
 } from './catalogs.service.js';
 import {
   createOriginTypeSchema,
@@ -152,4 +153,9 @@ catalogsRoutes.patch('/aid-areas/:id', requireRole('ADMIN'), asyncHandler(async 
 catalogsRoutes.delete('/aid-areas/:id', requireRole('ADMIN'), asyncHandler(async (req, res) => {
   await deleteAidArea(req.params.id!, req.user!.sub);
   res.json({ data: { ok: true } });
+}));
+
+catalogsRoutes.get('/:kind/:id/cases', asyncHandler(async (req, res) => {
+  const result = await listCatalogCases(req.params.kind!, req.params.id!);
+  res.json({ data: result });
 }));

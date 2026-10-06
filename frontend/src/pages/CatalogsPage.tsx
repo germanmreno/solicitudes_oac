@@ -15,7 +15,8 @@ import {
   listAidTypes,
   listAidAreas,
 } from '@/features/catalogs/catalogs.api';
-import type { CatalogItem } from '@/features/catalogs/catalogs.api';
+import type { CatalogItem, CatalogKind } from '@/features/catalogs/catalogs.api';
+import { CatalogCasesDialog } from '@/components/catalogs/CatalogCasesDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 
@@ -23,12 +24,15 @@ interface EditableRowProps {
   item: CatalogItem;
   onSave: (id: string, data: Record<string, unknown>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onViewCases: (item: CatalogItem) => void;
+  showAreaCount?: boolean;
 }
 
-function EditableRow({ item, onSave, onDelete }: EditableRowProps) {
+function EditableRow({ item, onSave, onDelete, onViewCases, showAreaCount }: EditableRowProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [busy, setBusy] = useState(false);
+  const blocked = (item.usageCount ?? 0) > 0 || (item.areaCount ?? 0) > 0;
 
   const handleSave = useCallback(async () => {
     if (!name.trim() || name.trim().length < 2) return;
@@ -65,6 +69,24 @@ function EditableRow({ item, onSave, onDelete }: EditableRowProps) {
           <span className={item.active ? '' : 'text-muted-foreground line-through'}>{item.name}</span>
         )}
       </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {(item.usageCount ?? 0) > 0 ? (
+          <button
+            type="button"
+            onClick={() => onViewCases(item)}
+            className="text-primary hover:underline font-medium"
+            aria-label={`Ver los ${item.usageCount} casos de ${item.name}`}
+            title="Ver casos"
+          >
+            {item.usageCount}
+          </button>
+        ) : (
+          <span className="text-muted-foreground">0</span>
+        )}
+      </TableCell>
+      {showAreaCount && (
+        <TableCell className="text-right tabular-nums">{item.areaCount ?? 0}</TableCell>
+      )}
       <TableCell className="text-right">
         {editing ? (
           <div className="flex gap-1 justify-end">
@@ -80,7 +102,13 @@ function EditableRow({ item, onSave, onDelete }: EditableRowProps) {
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleDelete} disabled={busy} title="Eliminar">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDelete}
+              disabled={busy || blocked}
+              title={blocked ? 'No se puede eliminar: tiene casos o áreas asociadas' : 'Eliminar'}
+            >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
@@ -97,6 +125,8 @@ function CatalogManager({
   onDelete,
   placeholder,
   extraNewFields,
+  casesKind,
+  showAreaCount,
 }: {
   items: CatalogItem[];
   onAdd: (data: Record<string, string | boolean>) => Promise<void>;
@@ -104,10 +134,13 @@ function CatalogManager({
   onDelete: (id: string) => Promise<void>;
   placeholder?: string;
   extraNewFields?: React.ReactNode;
+  casesKind: CatalogKind;
+  showAreaCount?: boolean;
 }) {
   const qc = useQueryClient();
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [casesItem, setCasesItem] = useState<CatalogItem | null>(null);
 
   const handleAdd = useCallback(async () => {
     if (!newName.trim() || newName.trim().length < 2) return;
@@ -146,16 +179,32 @@ function CatalogManager({
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
+              <TableHead className="text-right">Casos</TableHead>
+              {showAreaCount && <TableHead className="text-right">Áreas</TableHead>}
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <EditableRow key={item.id} item={item} onSave={onSave} onDelete={onDelete} />
+              <EditableRow
+                key={item.id}
+                item={item}
+                onSave={onSave}
+                onDelete={onDelete}
+                onViewCases={setCasesItem}
+                showAreaCount={showAreaCount}
+              />
             ))}
           </TableBody>
         </Table>
       )}
+
+      <CatalogCasesDialog
+        kind={casesKind}
+        item={casesItem}
+        open={!!casesItem}
+        onOpenChange={(o) => { if (!o) setCasesItem(null); }}
+      />
     </div>
   );
 }
@@ -249,6 +298,7 @@ export function CatalogsPage() {
                 onAdd={makeOnAdd('/catalogs/origin-types')}
                 onSave={makeOnSave('/catalogs/origin-types')}
                 onDelete={makeOnDelete('/catalogs/origin-types')}
+                casesKind="origin-types"
                 placeholder="Ej: Interno"
               />
             </CardContent>
@@ -264,6 +314,7 @@ export function CatalogsPage() {
                 onAdd={makeOnAdd('/catalogs/sites')}
                 onSave={makeOnSave('/catalogs/sites')}
                 onDelete={makeOnDelete('/catalogs/sites')}
+                casesKind="sites"
                 placeholder="Ej: Sede Bolívar"
               />
             </CardContent>
@@ -279,6 +330,7 @@ export function CatalogsPage() {
                 onAdd={makeOnAdd('/catalogs/external-origins')}
                 onSave={makeOnSave('/catalogs/external-origins')}
                 onDelete={makeOnDelete('/catalogs/external-origins')}
+                casesKind="external-origins"
                 placeholder="Ej: Comunidad Nueva Jerusalén"
               />
             </CardContent>
@@ -294,6 +346,8 @@ export function CatalogsPage() {
                 onAdd={makeOnAdd('/catalogs/aid-types')}
                 onSave={makeOnSave('/catalogs/aid-types')}
                 onDelete={makeOnDelete('/catalogs/aid-types')}
+                casesKind="aid-types"
+                showAreaCount
                 placeholder="Ej: Social"
               />
             </CardContent>
@@ -324,6 +378,7 @@ export function CatalogsPage() {
                   onAdd={makeOnAdd('/catalogs/aid-areas', { aidTypeId: selectedTypeId })}
                   onSave={makeOnSave('/catalogs/aid-areas')}
                   onDelete={makeOnDelete('/catalogs/aid-areas')}
+                  casesKind="aid-areas"
                   placeholder="Ej: Cardiología"
                 />
               )}

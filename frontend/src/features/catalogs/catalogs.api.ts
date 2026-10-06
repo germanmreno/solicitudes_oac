@@ -7,6 +7,31 @@ export interface CatalogItem {
   requiresSite?: boolean;
   requiresDetail?: boolean;
   aidType?: { id: string; name: string };
+  usageCount?: number;
+  areaCount?: number;
+}
+
+export type CatalogKind =
+  | 'origin-types'
+  | 'sites'
+  | 'external-origins'
+  | 'aid-types'
+  | 'aid-areas';
+
+export interface CatalogCase {
+  id: string;
+  fileNumber: string | null;
+  applicantName: string;
+  applicantIdNumber: string;
+  registrationDate: string;
+  aidStatus: 'ATENDIDO' | 'EN_PROCESO' | 'EN_EVALUACION' | 'NO_PROCEDE';
+  aidType: { name: string } | null;
+  aidArea: { name: string } | null;
+}
+
+export interface CatalogCasesResult {
+  total: number;
+  items: CatalogCase[];
 }
 
 export async function listOriginTypes(): Promise<CatalogItem[]> {
@@ -32,6 +57,11 @@ export async function listAidTypes(): Promise<CatalogItem[]> {
 export async function listAidAreas(typeId?: string): Promise<CatalogItem[]> {
   const params = typeId ? `?typeId=${typeId}` : '';
   const { data } = await api.get<{ data: CatalogItem[] }>(`/catalogs/aid-areas${params}`);
+  return data.data;
+}
+
+export async function listCatalogCases(kind: CatalogKind, id: string): Promise<CatalogCasesResult> {
+  const { data } = await api.get<{ data: CatalogCasesResult }>(`/catalogs/${kind}/${id}/cases`);
   return data.data;
 }
 
