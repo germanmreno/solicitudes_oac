@@ -39,8 +39,6 @@ export interface StatsSummary {
   proyecto: StatsProyecto | null;
   totals: {
     count: number;
-    amountUsd: string;
-    amountBs: string;
     pagadoUsd: string;
     pendienteUsd: string;
     pagadoBs: string;

@@ -12,8 +12,6 @@ interface MonthlyAmountRow {
 }
 
 interface AmountRow {
-  amountUsd: string;
-  amountBs: string;
   pagadoUsd: string;
   pendienteUsd: string;
   pagadoBs: string;
@@ -37,10 +35,10 @@ interface AmountBreakdown {
 }
 
 const AMOUNT_COLUMNS = `
-  COALESCE(SUM(CASE WHEN "paymentStatus" = 'PAGADO' THEN "amountUsd" END), 0)::numeric(14,2) AS "pagadoUsd",
-  COALESCE(SUM(CASE WHEN "paymentStatus" IS DISTINCT FROM 'PAGADO' THEN "amountUsd" END), 0)::numeric(14,2) AS "pendienteUsd",
-  COALESCE(SUM(CASE WHEN "paymentStatus" = 'PAGADO' THEN "amountBs" END), 0)::numeric(14,2) AS "pagadoBs",
-  COALESCE(SUM(CASE WHEN "paymentStatus" IS DISTINCT FROM 'PAGADO' THEN "amountBs" END), 0)::numeric(14,2) AS "pendienteBs"
+  COALESCE(SUM(CASE WHEN "amountBs" IS NULL AND "paymentStatus" = 'PAGADO' THEN "amountUsd" END), 0)::numeric(14,2) AS "pagadoUsd",
+  COALESCE(SUM(CASE WHEN "amountBs" IS NULL AND "paymentStatus" IS DISTINCT FROM 'PAGADO' THEN "amountUsd" END), 0)::numeric(14,2) AS "pendienteUsd",
+  COALESCE(SUM(CASE WHEN "amountBs" IS NOT NULL AND "paymentStatus" = 'PAGADO' THEN "amountBs" END), 0)::numeric(14,2) AS "pagadoBs",
+  COALESCE(SUM(CASE WHEN "amountBs" IS NOT NULL AND "paymentStatus" IS DISTINCT FROM 'PAGADO' THEN "amountBs" END), 0)::numeric(14,2) AS "pendienteBs"
 `;
 
 function parseDateRange(to?: string): Date | undefined {
@@ -69,10 +67,7 @@ function buildFilter(dateFrom?: Date, dateTo?: Date, extra?: Prisma.Sql): Prisma
 
 function totalsSql(filter: Prisma.Sql): Prisma.Sql {
   return Prisma.sql`
-    SELECT
-      COALESCE(SUM("amountUsd"), 0)::numeric(14,2) AS "amountUsd",
-      COALESCE(SUM("amountBs"), 0)::numeric(14,2) AS "amountBs",
-      ${Prisma.raw(AMOUNT_COLUMNS)}
+    SELECT ${Prisma.raw(AMOUNT_COLUMNS)}
     FROM "Census"
     ${filter}
   `;
@@ -197,7 +192,7 @@ export async function getSummary(from?: string, to?: string) {
   ]);
 
   const amounts = totalsRows[0] ?? {
-    amountUsd: '0', amountBs: '0', pagadoUsd: '0', pendienteUsd: '0', pagadoBs: '0', pendienteBs: '0',
+    pagadoUsd: '0', pendienteUsd: '0', pagadoBs: '0', pendienteBs: '0',
   };
 
   const originName = new Map(originTypes.map((o) => [o.id, o.name]));
@@ -247,8 +242,6 @@ export async function getSummary(from?: string, to?: string) {
     proyecto,
     totals: {
       count: countResult._count.id,
-      amountUsd: amounts.amountUsd,
-      amountBs: amounts.amountBs,
       pagadoUsd: amounts.pagadoUsd,
       pendienteUsd: amounts.pendienteUsd,
       pagadoBs: amounts.pagadoBs,

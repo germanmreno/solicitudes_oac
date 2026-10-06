@@ -143,8 +143,9 @@
 - **Página** `frontend/src/pages/ChartsPage.tsx`:
   - Ruta `/charts`, accesible por todo usuario autenticado.
   - Filtro de rango de fechas (from/to) que alimenta `GET /api/v1/stats/summary`.
-  - KPIs: total de solicitudes, monto total USD, monto total Bs, más el desglose de pagos: Pagado USD, Pendiente USD, Pagado Bs., Pendiente Bs.
-  - **Gastos (pagado vs. pendiente)**: Bar apilado **por tipo de ayuda** (`byAidType`), **por procedencia general** (`byOriginType`, interna/externa) y **mensual** (`monthlyAmounts`), todos con series Pagado/Pendiente en USD y Bs. (doble eje). `makeExpenseOption` es la función común; `makeMonthlyOption` la reutiliza.
+  - KPIs de pagos: Pagado USD, Pendiente USD, Pagado Bs., Pendiente Bs. **No se muestran totales** (ni conteo total ni monto total).
+  - **Gastos (pagado vs. pendiente)**: Barras **agrupadas** (no apiladas) **por tipo de ayuda** (`byAidType`), **por procedencia general** (`byOriginType`, interna/externa) y **mensual** (`monthlyAmounts`), con series Pagado/Pendiente en USD y Bs. (doble eje). `makeExpenseOption` es la función común; `makeMonthlyOption` la reutiliza.
+  - **Moneda única por registro**: cada solicitud cuenta en **una sola** moneda: si tiene monto en Bs. (`amountBs IS NOT NULL`) → Bs.; si no → USD. Así un registro con ambos montos no se duplica en USD y Bs. (evita doble conteo).
   - **Proyecto** (sección dedicada): si existe un `AidType` llamado "Proyecto" (búsqueda case-insensitive), el backend devuelve `proyecto` con su desglose pagado/pendiente (USD y Bs.), su conteo y su serie mensual propia (`proyecto.monthly`). El front lo muestra **completamente separado** del resto, con KPIs y su gráfica mensual. Si no existe el tipo, `proyecto` es `null` y la sección no aparece.
   - Gráficos de frecuencia (conteo): Pie de procedencias (por tipo), Bar de sedes más frecuentes (internas), Pie de procedencias externas, Bar horizontal de áreas/especialidades más atendidas, Pie por tipo de ayuda.
   - Paleta CVM: `['#638c3a', '#1e3a6b', '#E8DCC4', '#C98A2B', '#3F8F4F', '#B23A3A', '#8FA463', '#4A6FA5']`.

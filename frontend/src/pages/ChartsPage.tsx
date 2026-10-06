@@ -73,7 +73,6 @@ function makeExpenseOption(data: ExpenseDatum[], title: string): ECOption {
       {
         name: 'Pagado USD',
         type: 'bar',
-        stack: 'usd',
         data: data.map((d) => Number(d.pagadoUsd)),
         itemStyle: { color: CVM_PALETTE[0] },
         yAxisIndex: 0,
@@ -81,7 +80,6 @@ function makeExpenseOption(data: ExpenseDatum[], title: string): ECOption {
       {
         name: 'Pendiente USD',
         type: 'bar',
-        stack: 'usd',
         data: data.map((d) => Number(d.pendienteUsd)),
         itemStyle: { color: CVM_PALETTE[3] },
         yAxisIndex: 0,
@@ -89,7 +87,6 @@ function makeExpenseOption(data: ExpenseDatum[], title: string): ECOption {
       {
         name: 'Pagado Bs.',
         type: 'bar',
-        stack: 'bs',
         data: data.map((d) => Number(d.pagadoBs)),
         itemStyle: { color: CVM_PALETTE[1] },
         yAxisIndex: 1,
@@ -97,7 +94,6 @@ function makeExpenseOption(data: ExpenseDatum[], title: string): ECOption {
       {
         name: 'Pendiente Bs.',
         type: 'bar',
-        stack: 'bs',
         data: data.map((d) => Number(d.pendienteBs)),
         itemStyle: { color: CVM_PALETTE[4] },
         yAxisIndex: 1,
@@ -140,7 +136,10 @@ export function ChartsPage() {
   return (
     <div className="container-page max-w-6xl">
       <h1 className="text-2xl font-serif text-secondary mb-1">Gráficos</h1>
-      <p className="text-sm text-muted-foreground mb-4">Resumen estadístico de las solicitudes registradas.</p>
+      <p className="text-sm text-muted-foreground mb-4">
+        Resumen estadístico de las solicitudes registradas. Cada solicitud se contabiliza en una sola
+        moneda: en Bs. si tiene monto en bolívares; en caso contrario, en USD.
+      </p>
 
       <div className="flex items-end gap-3 mb-6 flex-wrap">
         <div>
@@ -165,21 +164,6 @@ export function ChartsPage() {
         <p className="text-center text-muted-foreground py-12">Sin datos en el rango seleccionado.</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total de solicitudes</CardTitle></CardHeader>
-              <CardContent><p className="text-3xl font-bold text-secondary">{stats.totals.count}</p></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total USD</CardTitle></CardHeader>
-              <CardContent><p className="text-3xl font-bold text-secondary">{formatCurrency(stats.totals.amountUsd, 'USD')}</p></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Bs.</CardTitle></CardHeader>
-              <CardContent><p className="text-3xl font-bold text-secondary">{formatCurrency(Number(stats.totals.amountBs), 'VES')}</p></CardContent>
-            </Card>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagado USD</CardTitle></CardHeader>

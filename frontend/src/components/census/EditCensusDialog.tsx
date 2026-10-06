@@ -164,7 +164,13 @@ export function EditCensusDialog({
   const mutation = useMutation({
     mutationFn: (values: CensusFormValues) => {
       const { aidStatus: _aidStatus, paymentStatus: _paymentStatus, paymentDate: _paymentDate, ...rest } = values as Record<string, unknown>;
-      const payload = { ...rest, registrationDate: dateInputToIso(values.registrationDate) };
+      const requiresSite = originTypes.find((o) => o.id === values.originTypeId)?.requiresSite ?? false;
+      const payload = {
+        ...rest,
+        registrationDate: dateInputToIso(values.registrationDate),
+        siteId: requiresSite ? (values.siteId || null) : null,
+        externalOriginId: requiresSite ? null : (values.externalOriginId || null),
+      };
       return updateCensus(census.id, payload);
     },
     onSuccess: () => {
