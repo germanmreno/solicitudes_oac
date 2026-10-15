@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/select';
 import { isSentinelIdNumber } from '@/lib/schemas/census';
 
+type IdMode = 'CEDULA' | 'SITUR' | 'N/A' | 'N/P';
+
 export function IdNumberField({
   id,
   value,
@@ -23,17 +25,25 @@ export function IdNumberField({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const sentinel = isSentinelIdNumber(value || '');
-  const mode = sentinel ? value.toUpperCase() : 'CEDULA';
+  const trimmed = (value || '').trim().toUpperCase();
+  const sentinel = isSentinelIdNumber(trimmed);
+  const mode: IdMode = sentinel ? (trimmed as IdMode) : trimmed.startsWith('C-') ? 'SITUR' : 'CEDULA';
+
+  function handleMode(next: string) {
+    if (next === 'CEDULA') onChange('');
+    else if (next === 'SITUR') onChange('C-');
+    else onChange(next);
+  }
 
   return (
     <div className="flex gap-2">
-      <Select value={mode} onValueChange={(v) => onChange(v === 'CEDULA' ? '' : v)} disabled={disabled}>
+      <Select value={mode} onValueChange={handleMode} disabled={disabled}>
         <SelectTrigger className="w-[150px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="CEDULA">Cédula</SelectItem>
+          <SelectItem value="SITUR">SITUR</SelectItem>
           <SelectItem value="N/A">No aplica</SelectItem>
           <SelectItem value="N/P">No posee</SelectItem>
         </SelectContent>
@@ -42,7 +52,7 @@ export function IdNumberField({
         id={id}
         className="flex-1"
         value={sentinel ? '' : value ?? ''}
-        placeholder={sentinel ? 'No aplica / no posee' : placeholder}
+        placeholder={sentinel ? 'No aplica / no posee' : mode === 'SITUR' ? 'C-123456789' : placeholder}
         disabled={disabled || sentinel}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}

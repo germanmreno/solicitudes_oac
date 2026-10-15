@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Loader2, ChevronLeft, ChevronRight, FileText, CalendarClock } from 'lucide-react';
+import { Plus, Search, Loader2, ChevronLeft, ChevronRight, FileText, CalendarClock, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -17,8 +17,11 @@ import {
 import { DataTable, type DataTableColumn, type DataTableSort } from '@/components/ui/DataTable';
 import { EditDateDialog } from '@/components/census/EditDateDialog';
 import { listCensus, type CensusListItem } from '@/features/census/census.api';
+import { downloadCensusExport } from '@/features/export/export.api';
 import { listAidTypes, listAidAreas, listOriginTypes } from '@/features/catalogs/catalogs.api';
 import { formatDate } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api/client';
+import { toast } from '@/components/ui/toast';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
@@ -49,6 +52,19 @@ export function CensusListPage() {
   const [pageSize, setPageSize] = useState<number>(20);
   const [sort, setSort] = useState<DataTableSort>({ columnId: 'registrationDate', direction: 'desc' });
   const [dateEditing, setDateEditing] = useState<CensusListItem | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await downloadCensusExport();
+      toast.success('Exportación generada');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo exportar'));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const params = {
     q: q || undefined,
@@ -209,7 +225,11 @@ export function CensusListPage() {
           <h1 className="text-2xl font-serif text-secondary">Solicitudes registradas</h1>
           <p className="text-sm text-muted-foreground">Todas las solicitudes del sistema.</p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+            Exportar a Excel
+          </Button>
           <Button asChild>
             <Link to="/census/new">
               <Plus className="h-4 w-4 mr-1" /> Nueva solicitud

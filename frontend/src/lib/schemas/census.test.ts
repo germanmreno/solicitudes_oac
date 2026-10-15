@@ -3,8 +3,36 @@ import {
   censusFormSchema,
   cedulaSchema,
   dateInputToIso,
+  isSiturIdNumber,
+  normalizeDecimalInput,
   toDateInputValue,
 } from './census';
+
+describe('identificador SITUR', () => {
+  it('acepta el formato SITUR', () => {
+    expect(() => cedulaSchema.parse('C-123456789')).not.toThrow();
+    expect(isSiturIdNumber('C-123456789')).toBe(true);
+  });
+  it('rechaza SITUR inválido', () => {
+    expect(() => cedulaSchema.parse('C-12345')).toThrow();
+    expect(() => cedulaSchema.parse('C-1234567890')).toThrow();
+    expect(isSiturIdNumber('C-12345')).toBe(false);
+  });
+});
+
+describe('normalizeDecimalInput', () => {
+  it('normaliza formatos ES/EN', () => {
+    expect(normalizeDecimalInput('1.234,56')).toBe('1234.56');
+    expect(normalizeDecimalInput('2,423,846.87')).toBe('2423846.87');
+    expect(normalizeDecimalInput('1234,56')).toBe('1234.56');
+    expect(normalizeDecimalInput('1,234.56')).toBe('1234.56');
+  });
+  it('rechaza valores no numéricos', () => {
+    expect(normalizeDecimalInput('abc')).toBeUndefined();
+    expect(normalizeDecimalInput('-5')).toBeUndefined();
+    expect(normalizeDecimalInput('1.23456789')).toBeUndefined();
+  });
+});
 
 describe('fecha de registro', () => {
   it('dateInputToIso preserva el día calendario en hora local', () => {
@@ -113,6 +141,39 @@ describe('censusFormSchema', () => {
       aidAreaId: 'some-uuid',
       aidDescription: 'Detalle',
       beneficiarySameAsApplicant: false,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('normaliza montos con separadores de miles y decimales', () => {
+    const result = censusFormSchema.safeParse({
+      applicantName: 'Juan',
+      applicantIdNumber: 'V-27376369',
+      applicantSex: 'MASCULINO',
+      originTypeId: 'some-uuid',
+      aidTypeId: 'some-uuid',
+      aidAreaId: 'some-uuid',
+      aidDescription: 'Detalle',
+      amountUsd: '1.234,56',
+      amountBs: '2,423,846.87',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.amountUsd).toBe('1234.56');
+      expect(result.data.amountBs).toBe('2423846.87');
+    }
+  });
+
+  it('rechaza montos no numéricos', () => {
+    const result = censusFormSchema.safeParse({
+      applicantName: 'Juan',
+      applicantIdNumber: 'V-27376369',
+      applicantSex: 'MASCULINO',
+      originTypeId: 'some-uuid',
+      aidTypeId: 'some-uuid',
+      aidAreaId: 'some-uuid',
+      aidDescription: 'Detalle',
+      amountUsd: 'abc',
     });
     expect(result.success).toBe(false);
   });

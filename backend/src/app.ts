@@ -15,6 +15,7 @@ import { documentTypesRoutes } from './modules/documentTypes/documentTypes.route
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { publicRoutes } from './modules/public/public.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
+import { exportRoutes } from './modules/export/export.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -50,6 +51,7 @@ export function createApp(): Application {
   app.use('/api/v1/audit', auditRoutes);
   app.use('/api/v1/public', publicRoutes);
   app.use('/api/v1/import', importRoutes);
+  app.use('/api/v1/export', exportRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({

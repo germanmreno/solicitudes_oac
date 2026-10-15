@@ -17,6 +17,12 @@ describe('import.normalizeCedula', () => {
     expect(normalizeCedula('27376369')).toBe('V-27376369');
     expect(normalizeCedula('C.I. V-12345678')).toBe('V-12345678');
   });
+
+  it('normaliza códigos SITUR', () => {
+    expect(normalizeCedula('C-123456789')).toBe('C-123456789');
+    expect(normalizeCedula('c 123456789')).toBe('C-123456789');
+    expect(normalizeCedula('C123456789')).toBe('C-123456789');
+  });
 });
 
 describe('import.parseSex', () => {

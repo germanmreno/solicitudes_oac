@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Save } from 'lucide-react';
 import {
@@ -193,6 +193,13 @@ export function EditCensusDialog({
     setPendingValues(values);
   }
 
+  function onInvalid(errors: FieldErrors<CensusFormValues>) {
+    const firstKey = Object.keys(errors)[0];
+    if (!firstKey) return;
+    const message = (errors as Record<string, { message?: string } | undefined>)[firstKey]?.message;
+    toast.error(message ? `Revise el formulario: ${message}` : 'Revise los campos marcados en rojo');
+  }
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) setPendingValues(null);
     onOpenChange(nextOpen);
@@ -233,7 +240,7 @@ export function EditCensusDialog({
             </DialogFooter>
           </div>
         ) : (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 text-sm">
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-5 text-sm">
           <section>
             <h3 className="font-semibold text-secondary mb-2">Registro</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -437,13 +444,13 @@ export function EditCensusDialog({
               <Field label="Observación">
                 <Input {...form.register('aidObservation')} />
               </Field>
-              <Field label="Monto (USD)">
+              <Field label="Monto (USD)" error={form.formState.errors.amountUsd?.message}>
                 <Input {...form.register('amountUsd')} placeholder="0.00" />
               </Field>
-              <Field label="Monto (Bs.)">
+              <Field label="Monto (Bs.)" error={form.formState.errors.amountBs?.message}>
                 <Input {...form.register('amountBs')} placeholder="0.00" />
               </Field>
-              <Field label="Tasa del día">
+              <Field label="Tasa del día" error={form.formState.errors.paymentRate?.message}>
                 <Input {...form.register('paymentRate')} placeholder="0.0000" />
               </Field>
               <Field label="Modalidad de gestión">

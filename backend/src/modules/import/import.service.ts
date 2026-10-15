@@ -187,6 +187,8 @@ export function normalizeCedula(value: string | undefined): string {
   if (!raw) return raw;
   if (/^N\/?A$/.test(raw) || raw === 'NO APLICA' || raw === 'NO APLICA.') return 'N/A';
   if (/^N\/?P$/.test(raw) || raw === 'NO POSEE' || raw === 'NO POSEE.') return 'N/P';
+  const situr = raw.replace(/[^A-Z0-9]/g, '');
+  if (/^C\d{9}$/.test(situr)) return `C-${situr.slice(1)}`;
   let s = raw.replace(/^C\.?\s*I\.?\s*/i, '');
   s = s.replace(/[\s.]/g, '');
   if (!/^[VENE]-\d+$/.test(s)) s = `V-${s}`;

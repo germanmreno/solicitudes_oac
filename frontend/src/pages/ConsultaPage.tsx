@@ -32,7 +32,7 @@ export function ConsultaPage() {
             <CardHeader>
               <CardTitle>Consulta de estatus</CardTitle>
               <CardDescription>
-                Ingrese su N° de expediente o cédula para conocer el estado de su solicitud.
+                Ingrese su N° de expediente, cédula o SITUR para conocer el estado de su solicitud.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -44,10 +44,10 @@ export function ConsultaPage() {
                 className="space-y-4"
               >
                 <div>
-                  <Label htmlFor="q">N° de expediente o cédula</Label>
+                  <Label htmlFor="q">N° de expediente, cédula o SITUR</Label>
                   <Input
                     id="q"
-                    placeholder="Ej: OAC-0001-2026 o V-12345678"
+                    placeholder="Ej: OAC-0001-2026, V-12345678 o C-123456789"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     autoComplete="off"

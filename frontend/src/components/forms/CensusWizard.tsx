@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Save, ArrowRight, ArrowLeft, Sparkles, FileWarning } from 'lucide-react';
@@ -36,6 +36,15 @@ import { getErrorMessage } from '@/lib/api/client';
 import { toast } from '@/components/ui/toast';
 
 const STEPS = ['Datos del solicitante', 'Datos del beneficiario', 'Información de la ayuda', 'Pago y documentos'];
+
+const FIELD_STEP: Record<string, number> = {
+  fileNumber: 0, registrationDate: 0, applicantName: 0, applicantIdNumber: 0, applicantSex: 0,
+  originTypeId: 0, siteId: 0, externalOriginId: 0, originDetail: 0, phone: 0, email: 0,
+  beneficiarySameAsApplicant: 1, beneficiaryName: 1, beneficiaryIdNumber: 1, beneficiarySex: 1,
+  aidTypeId: 2, aidAreaId: 2, aidAreaOther: 2, aidDescription: 2, aidStatus: 2, aidProvider: 2,
+  amountUsd: 2, amountBs: 2, aidObservation: 2,
+  paymentRate: 3, paymentDate: 3, paymentStatus: 3,
+};
 
 const STATUS_OPTIONS = [
   { value: 'EN_EVALUACION', label: 'En evaluación' },
@@ -228,6 +237,15 @@ export function CensusWizard() {
     }
   }
 
+  function onInvalid(errors: FieldErrors<CensusFormValues>) {
+    const firstKey = Object.keys(errors)[0];
+    if (!firstKey) return;
+    const stepIndex = FIELD_STEP[firstKey] ?? 0;
+    setStep(stepIndex);
+    const message = (errors as Record<string, { message?: string } | undefined>)[firstKey]?.message;
+    toast.error(message ? `No se pudo guardar: ${message}` : 'Revise los campos marcados en rojo');
+  }
+
   return (
     <div className="container-page max-w-3xl">
       <h1 className="text-3xl font-serif text-secondary mb-1">Nueva solicitud</h1>
@@ -237,7 +255,7 @@ export function CensusWizard() {
 
       <Stepper current={step} steps={STEPS} />
 
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
         <Card>
           <CardHeader>
             <CardTitle>{STEPS[step]}</CardTitle>
@@ -294,7 +312,7 @@ export function CensusWizard() {
                         />
                       )}
                     />
-                    <p className="help-text">Formatos: V-12345678, E-1234567, N-12345678, N/A (no aplica), N/P (no posee)</p>
+                    <p className="help-text">Formatos: V-12345678, E-1234567, N-12345678, C-123456789 (SITUR), N/A (no aplica), N/P (no posee)</p>
                     {form.formState.errors.applicantIdNumber && (
                       <p className="error-text">{form.formState.errors.applicantIdNumber.message}</p>
                     )}
@@ -587,12 +605,18 @@ export function CensusWizard() {
                   <div>
                     <Label htmlFor="amountUsd">Monto ($) (Opcional)</Label>
                     <Input id="amountUsd" placeholder="0.00" {...form.register('amountUsd')} />
+                    {form.formState.errors.amountUsd && (
+                      <p className="error-text">{form.formState.errors.amountUsd.message}</p>
+                    )}
                   </div>
                 </div>
 
                 <div>
                   <Label htmlFor="amountBs">Monto (Bs.) (Opcional)</Label>
                   <Input id="amountBs" placeholder="0.00" {...form.register('amountBs')} />
+                  {form.formState.errors.amountBs && (
+                    <p className="error-text">{form.formState.errors.amountBs.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -608,6 +632,9 @@ export function CensusWizard() {
                   <div>
                     <Label htmlFor="paymentRate">Tasa del día (Opcional)</Label>
                     <Input id="paymentRate" placeholder="0.0000" {...form.register('paymentRate')} />
+                    {form.formState.errors.paymentRate && (
+                      <p className="error-text">{form.formState.errors.paymentRate.message}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="paymentDate">Fecha de pago (Opcional)</Label>

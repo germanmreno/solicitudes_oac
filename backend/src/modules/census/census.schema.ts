@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { idNumberRegex } from '../auth/auth.schema.js';
+import { ID_NUMBER_MESSAGE, idNumberRegex } from '../auth/auth.schema.js';
+import { isValidDecimalInput, normalizeDecimalInput } from '../../lib/decimal.js';
 
 export const sexSchema = z.enum(['MASCULINO', 'FEMENINO', 'NO_APLICA']);
 
@@ -15,10 +16,10 @@ export const paymentStatusSchema = z.enum(['PENDIENTE', 'PAGADO', 'ANULADO']);
 const decimalString = z
   .union([z.string(), z.number()])
   .transform((v) => (typeof v === 'number' ? v.toString() : v))
-  .refine((v) => v === '' || /^\d+(\.\d{1,4})?$/.test(v), {
-    message: 'Monto inválido',
+  .refine(isValidDecimalInput, {
+    message: 'Monto inválido. Use formatos como 1.234,56 o 1234.56 (máx. 4 decimales)',
   })
-  .transform((v) => (v === '' ? null : v))
+  .transform((v) => (v.trim() === '' ? null : normalizeDecimalInput(v) ?? null))
   .nullable()
   .optional();
 
@@ -37,10 +38,7 @@ export const censusFormBaseSchema = z.object({
     .transform((v) => (v ? new Date(v) : undefined)),
 
   applicantName: z.string().trim().min(3, 'El nombre del solicitante es obligatorio'),
-  applicantIdNumber: z
-    .string()
-    .trim()
-    .regex(idNumberRegex, 'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)'),
+  applicantIdNumber: z.string().trim().regex(idNumberRegex, ID_NUMBER_MESSAGE),
   applicantSex: sexSchema,
   applicantType: optionalString,
   personnelType: optionalString,
@@ -116,7 +114,7 @@ function refineCensus(
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['beneficiaryIdNumber'],
-        message: 'Formato inválido. Use V-27376369, E-1234567, N-12345678, N/A (no aplica) o N/P (no posee)',
+        message: ID_NUMBER_MESSAGE,
       });
     }
     if (!data.beneficiarySex) {

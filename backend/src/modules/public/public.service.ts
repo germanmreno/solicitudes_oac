@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middlewares/error.js';
-import { cedulaRegex } from '../auth/auth.schema.js';
+import { cedulaOrSiturRegex } from '../auth/auth.schema.js';
 
 const FILE_NUMBER_REGEX = /^OAC-\d{4}(?:-\d+)?-\d{4}$/i;
 
@@ -17,7 +17,7 @@ export async function consultarEstatus(q: string) {
         aidArea: { select: { name: true } },
       },
     });
-  } else if (cedulaRegex.test(q)) {
+  } else if (cedulaOrSiturRegex.test(q)) {
     census = await prisma.census.findFirst({
       where: { applicantIdNumber: q },
       include: {
